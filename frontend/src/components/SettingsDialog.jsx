@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { printer } from "@/lib/printer";
 import { useStore } from "@/hooks/useStore";
 import { toast } from "sonner";
-import { Usb, Cable, Zap, X, AlertTriangle } from "lucide-react";
+import { Usb, Cable, X, AlertTriangle } from "lucide-react";
 
 export default function SettingsDialog({ open, onOpenChange }) {
   const { drawerConnected, drawerInfo, setDrawerState } = useStore();
@@ -31,18 +31,6 @@ export default function SettingsDialog({ open, onOpenChange }) {
       toast.success("WebUSB printer connected.");
     } catch (e) {
       toast.error(e.message || "USB connection failed");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const testDrawer = async () => {
-    setBusy(true);
-    try {
-      await printer.testDrawer();
-      toast.success("Drawer pulse sent.");
-    } catch (e) {
-      toast.error(e.message || "Test failed");
     } finally {
       setBusy(false);
     }
@@ -167,18 +155,6 @@ export default function SettingsDialog({ open, onOpenChange }) {
               </p>
             </div>
           </details>
-
-          <Button
-            data-testid="test-drawer"
-            onClick={testDrawer}
-            disabled={busy || !drawerConnected}
-            className="w-full h-12 bg-amber-500 hover:bg-amber-400 text-black font-semibold"
-          >
-            <Zap className="h-4 w-4 mr-2" /> Test Drawer Pulse
-          </Button>
-          <div className="text-xs text-muted-foreground">
-            Sends <span className="font-mono">ESC p 0 25 250</span> (0x1B 0x70 0x00 0x19 0xFA) to open the drawer.
-          </div>
 
           <div className="border-t border-border pt-3 mt-2">
             <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground mb-2">Danger zone</div>

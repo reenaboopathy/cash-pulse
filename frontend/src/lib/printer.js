@@ -179,11 +179,6 @@ class SeltrackPrinter {
     await this._writeRaw(CMD.drawerPulse);
   }
 
-  async testDrawer() {
-    // Init + pulse
-    await this._writeMany([CMD.init, CMD.drawerPulse]);
-  }
-
   async printReceipt({ store = "SELTRACK", header = "CASH RECEIPT", lines = [], footer = "THANK YOU", openDrawer = true }) {
     const chunks = [CMD.init, CMD.alignCenter, CMD.boldOn, CMD.doubleSizeOn, enc.encode(`${store}\n`), CMD.doubleSizeOff, CMD.boldOff, enc.encode(`${header}\n`), enc.encode("--------------------------------\n"), CMD.alignLeft];
     for (const l of lines) chunks.push(enc.encode(`${l}\n`));

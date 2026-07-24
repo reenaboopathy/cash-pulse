@@ -64,6 +64,10 @@ export default function TransactionDialog({ type, defaultMethod = "CASH", onClos
       return toast.error("Cash drawer not connected. Pair it in Devices or switch to UPI/Bank.");
     }
     setBusy(true);
+    // Idempotency key generated at click time — a network retry re-uses this key so the server dedupes.
+    const clientId =
+      (typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID()) ||
+      `txn-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     try {
       if (isCash) {
         // Cash → drawer pulse + receipt BEFORE DB write
@@ -91,6 +95,7 @@ export default function TransactionDialog({ type, defaultMethod = "CASH", onClos
         payment_method: method,
         bank_id: requiresBank ? bankId : null,
         drawer_opened: isCash,
+        client_id: clientId,
       });
       await refreshAll();
       if (requiresBank) await refreshBanks();

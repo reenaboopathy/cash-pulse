@@ -12,6 +12,23 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
+// Handle expired / invalid tokens globally: clear session and bounce to /login.
+http.interceptors.response.use(
+  (r) => r,
+  (err) => {
+    const status = err?.response?.status;
+    const hadToken = !!localStorage.getItem("seltrack:token");
+    if (status === 401 && hadToken) {
+      localStorage.removeItem("seltrack:token");
+      // Only bounce when the user is currently inside an authenticated page
+      if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) {
+        window.location.assign("/login");
+      }
+    }
+    return Promise.reject(err);
+  }
+);
+
 export const api = {
   auth: {
     login: (mobile, password) => http.post("/auth/login", { mobile, password }).then((r) => r.data),

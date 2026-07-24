@@ -157,6 +157,7 @@ class Transaction(BaseModel):
     bank_name: Optional[str] = None
     drawer_opened: bool = True
     receipt_number: int = 0
+    client_id: Optional[str] = None
     created_at: str = Field(default_factory=now_iso)
 
 class TransactionCreate(BaseModel):
@@ -168,6 +169,7 @@ class TransactionCreate(BaseModel):
     payment_method: Literal["CASH", "UPI", "BANK"] = "CASH"
     bank_id: Optional[str] = None
     drawer_opened: bool = True
+    client_id: Optional[str] = None  # idempotency key
 
 class Reason(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -516,6 +518,12 @@ async def get_shift(shift_id: str):
 # ---- Transactions ----
 @api_router.post("/transactions", response_model=Transaction)
 async def create_transaction(payload: TransactionCreate):
+    # Idempotency guard
+    if payload.client_id:
+        existing = await db.transactions.find_one({"client_id": payload.client_id}, {"_id": 0})
+        if existing:
+            return existing
+
     shift = await get_open_shift()
     if not shift:
         raise HTTPException(400, "No open shift. Open a shift before recording transactions.")
@@ -547,21 +555,31 @@ async def create_transaction(payload: TransactionCreate):
         bank_name=bank["name"] if bank else None,
         drawer_opened=payload.drawer_opened if payload.payment_method == "CASH" else False,
         receipt_number=receipt_no,
+        client_id=payload.client_id,
     )
     await db.transactions.insert_one(txn.model_dump())
     if bank:
-        await adjust_bank_balance(bank["id"], payload.type, payload.amount, undo=False)
+        try:
+            await adjust_bank_balance(bank["id"], payload.type, payload.amount, undo=False)
+        except Exception as e:
+            # Roll back the transaction insert so ledger stays consistent
+            await db.transactions.delete_one({"id": txn.id})
+            logger.exception("Bank balance update failed; rolled back transaction")
+            raise HTTPException(500, f"Bank balance update failed: {e}")
     return txn
 
 @api_router.get("/transactions", response_model=List[Transaction])
 async def list_transactions(shift_id: Optional[str] = None, limit: int = 200, method: Optional[str] = None):
+    # If caller doesn't specify a shift, only return the currently open shift's txns.
+    # Never return "all" — that would leak historical rows into the live feed.
     q = {}
     if shift_id:
         q["shift_id"] = shift_id
     else:
         open_shift = await get_open_shift()
-        if open_shift:
-            q["shift_id"] = open_shift["id"]
+        if not open_shift:
+            return []
+        q["shift_id"] = open_shift["id"]
     if method:
         q["payment_method"] = method
     return await db.transactions.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
@@ -722,6 +740,11 @@ async def on_startup():
     await seed_staff()
     await seed_reasons()
     await seed_admin()
+    # Idempotency index on transactions.client_id (sparse — legacy rows without client_id are OK)
+    try:
+        await db.transactions.create_index("client_id", unique=True, sparse=True)
+    except Exception as e:
+        logger.warning(f"transactions.client_id index: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

@@ -4,7 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { api, INR, apiErrorText } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Banknote, Smartphone, Landmark, LogOut, KeyRound, ShieldAlert, Eraser, ArrowLeft, TrendingUp, TrendingDown, Wrench, RefreshCw, Users as UsersIcon, Store } from "lucide-react";
+import { Banknote, Smartphone, Landmark, LogOut, KeyRound, Eraser, TrendingUp, TrendingDown, Wrench, RefreshCw, Store } from "lucide-react";
 import BanksDialog from "@/components/BanksDialog";
 import ReportsDialog from "@/components/ReportsDialog";
 import PinPrompt from "@/components/PinPrompt";
