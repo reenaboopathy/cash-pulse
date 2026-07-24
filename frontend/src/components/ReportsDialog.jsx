@@ -193,7 +193,7 @@ export default function ReportsDialog({ open, onOpenChange }) {
         <DialogHeader>
           <DialogTitle>Reports</DialogTitle>
           <DialogDescription>
-            X-Report (current shift snapshot) &amp; Z-Report (closed shift final).
+            <b>Daily</b> · final report for the whole day. <b>Staff</b> · per-user activity + breakdown by method. <b>Expenses</b> · every OUT transaction with categories, staff, and payment method. <b>X-Report</b> · live snapshot of the current shift. <b>Z-Report</b> · final closed-shift report.
           </DialogDescription>
         </DialogHeader>
 
