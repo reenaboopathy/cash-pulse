@@ -7,129 +7,179 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useStore } from "@/hooks/useStore";
-import { api } from "@/lib/api";
+import { api, apiErrorText, INR } from "@/lib/api";
 import { printer, buildReceiptLines } from "@/lib/printer";
 import { toast } from "sonner";
 import StaffPicker from "@/components/StaffPicker";
+import CategoryPicker from "@/components/CategoryPicker";
+import { Banknote, Smartphone, Landmark } from "lucide-react";
 
-const CATEGORIES = {
-  IN: ["Cash Sale", "Deposit / Top-up", "Loan Repayment", "Other Income"],
-  OUT: ["Expense", "Vendor Payment", "Refund", "Payout / Withdrawal", "Other Expense"],
-  ADJUSTMENT: ["Cash Found", "Cash Missing", "Correction", "Manager Note"],
-};
+const METHODS = [
+  { value: "CASH", label: "Cash", icon: Banknote },
+  { value: "UPI", label: "UPI", icon: Smartphone },
+  { value: "BANK", label: "Bank", icon: Landmark },
+];
 
-export default function TransactionDialog({ type, onClose, onReceipt }) {
-  const { staff, refreshAll, shift, balance } = useStore();
+export default function TransactionDialog({ type, defaultMethod = "CASH", onClose, onReceipt }) {
+  const { staff, refreshAll, shift, balance, banks, refreshBanks } = useStore();
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
   const [printReceipt, setPrintReceipt] = useState(true);
   const [busy, setBusy] = useState(false);
   const [staffId, setStaffId] = useState("");
+  const [method, setMethod] = useState(defaultMethod);
+  const [bankId, setBankId] = useState("");
+
+  const open = !!type;
+  const activeStaff = staff.find((s) => s.id === staffId) || null;
+  const isCash = method === "CASH";
+  const requiresBank = method === "UPI" || method === "BANK";
 
   useEffect(() => {
     if (type) {
       setAmount("");
       setNote("");
-      setCategory(CATEGORIES[type]?.[0] || "");
-      setStaffId(""); // mandatory re-select each time
+      setCategory("");
+      setStaffId("");
+      setMethod(defaultMethod);
+      setBankId("");
     }
-  }, [type]);
+  }, [type, defaultMethod]);
 
-  const open = !!type;
-  const activeStaff = staff.find((s) => s.id === staffId) || null;
+  useEffect(() => {
+    if (open && requiresBank) refreshBanks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, method]);
 
   const submit = async () => {
-    if (!activeStaff) {
-      toast.error("Select the user performing this transaction.");
-      return;
-    }
-    if (!shift) {
-      toast.error("Open a shift first.");
-      return;
-    }
+    if (!activeStaff) return toast.error("Select the user performing this transaction.");
+    if (!shift) return toast.error("Open a shift first.");
+    if (!category) return toast.error("Select a reason / category.");
     const amt = Number(amount);
-    if (!(amt > 0) && type !== "ADJUSTMENT") {
-      toast.error("Enter a positive amount.");
-      return;
-    }
-    if (type === "ADJUSTMENT" && !amt) {
-      toast.error("Enter a non-zero adjustment amount (use negative for missing cash).");
-      return;
-    }
-    if (!printer.isConnected) {
-      toast.error("Cash drawer is not connected. Pair it in Devices before recording transactions.");
-      return;
+    if (!(amt > 0) && type !== "ADJUSTMENT") return toast.error("Enter a positive amount.");
+    if (type === "ADJUSTMENT" && !amt) return toast.error("Enter a non-zero adjustment amount.");
+    if (requiresBank && !bankId) return toast.error("Select the bank / UPI account.");
+    if (isCash && !printer.isConnected) {
+      return toast.error("Cash drawer not connected. Pair it in Devices or switch to UPI/Bank.");
     }
     setBusy(true);
     try {
-      // Pulse the drawer + print receipt FIRST — if the hardware fails, we don't record a phantom transaction
-      if (printReceipt) {
-        await printer.printReceipt({
-          header: `${type} · ${category}`,
-          lines: buildReceiptLines({
-            txn: { type, category, amount: amt, note, receipt_number: 0, created_at: new Date().toISOString() },
-            shift,
-            staffName: activeStaff.name,
-            balance: balance + (type === "IN" ? amt : type === "OUT" ? -amt : amt),
-          }),
-          openDrawer: true,
-        });
-      } else {
-        await printer.openDrawer();
+      if (isCash) {
+        // Cash → drawer pulse + receipt BEFORE DB write
+        if (printReceipt) {
+          await printer.printReceipt({
+            header: `${type} · ${category}`,
+            lines: buildReceiptLines({
+              txn: { type, category, amount: amt, note, receipt_number: 0, created_at: new Date().toISOString() },
+              shift,
+              staffName: activeStaff.name,
+              balance: balance + (type === "IN" ? amt : type === "OUT" ? -amt : amt),
+            }),
+            openDrawer: true,
+          });
+        } else {
+          await printer.openDrawer();
+        }
       }
-
       const txn = await api.transactions.create({
         type,
         category,
         amount: amt,
         note,
         staff_id: activeStaff.id,
-        drawer_opened: true,
+        payment_method: method,
+        bank_id: requiresBank ? bankId : null,
+        drawer_opened: isCash,
       });
       await refreshAll();
-      onReceipt?.({ txn, shift, staffName: activeStaff.name, balance: balance + (type === "IN" ? amt : type === "OUT" ? -amt : amt) });
-      toast.success(`${type} recorded · #${String(txn.receipt_number).padStart(4, "0")}`);
+      if (requiresBank) await refreshBanks();
+      onReceipt?.({
+        txn,
+        shift,
+        staffName: activeStaff.name,
+        balance: isCash ? balance + (type === "IN" ? amt : type === "OUT" ? -amt : amt) : balance,
+      });
+      toast.success(`${type} recorded · ${method} · #${String(txn.receipt_number).padStart(4, "0")}`);
       onClose();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || e?.message || "Failed to record transaction");
+      toast.error(apiErrorText(e, "Failed to record transaction"));
     } finally {
       setBusy(false);
     }
   };
 
+  const canConfirm = !busy && staffId && category && amount && (!requiresBank || bankId);
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent data-testid="txn-dialog" className="bg-[#111827] border-border">
+      <DialogContent data-testid="txn-dialog" className="bg-[#111827] border-border max-w-lg">
         <DialogHeader>
           <DialogTitle className="capitalize">
             Record {type === "IN" ? "Payment IN" : type === "OUT" ? "Payment OUT" : "Adjustment"}
           </DialogTitle>
           <DialogDescription>
-            Confirm who is performing this action — the drawer will pulse open on confirm.
+            Choose payment method — cash pulses the drawer, UPI/Bank posts to the selected bank ledger.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
           <StaffPicker value={staffId} onChange={setStaffId} testid="txn-staff" />
 
+          {/* Payment method */}
           <div>
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Category</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger data-testid="txn-category" className="bg-[#0B1120] border-border mt-1">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {(CATEGORIES[type] || []).map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Payment method</Label>
+            <div className="mt-1 grid grid-cols-3 gap-2">
+              {METHODS.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  data-testid={`method-${value.toLowerCase()}`}
+                  onClick={() => setMethod(value)}
+                  className={`rounded-md border py-2 px-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                    method === value
+                      ? "border-amber-500/60 bg-amber-500/10 text-amber-300"
+                      : "border-border bg-[#0B1120] text-slate-300 hover:bg-white/[0.04]"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {requiresBank && (
+            <div>
+              <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+                {method === "UPI" ? "UPI account" : "Bank account"}
+              </Label>
+              <Select value={bankId} onValueChange={setBankId}>
+                <SelectTrigger data-testid="txn-bank" className="bg-[#0B1120] border-border mt-1">
+                  <SelectValue placeholder="Select bank / UPI…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {banks.map((b) => (
+                    <SelectItem key={b.id} value={b.id} data-testid={`txn-bank-opt-${b.id}`}>
+                      <span className="font-medium">{b.name}</span>
+                      <span className="text-muted-foreground ml-2 font-mono">{INR(b.current_balance)}</span>
+                    </SelectItem>
+                  ))}
+                  {banks.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">
+                      No banks yet — an admin must add one.
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <CategoryPicker category={type} value={category} onChange={setCategory} testid="txn-category" />
 
           <div>
             <Label className="text-xs uppercase tracking-widest text-muted-foreground">
-              Amount (INR){type === "ADJUSTMENT" ? " — negative = missing cash" : ""}
+              Amount (INR){type === "ADJUSTMENT" ? " — negative = missing" : ""}
             </Label>
             <Input
               data-testid="txn-amount"
@@ -139,7 +189,6 @@ export default function TransactionDialog({ type, onClose, onReceipt }) {
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
               className="bg-[#0B1120] border-border font-mono text-xl h-12 mt-1"
-              autoFocus
             />
           </div>
 
@@ -154,10 +203,12 @@ export default function TransactionDialog({ type, onClose, onReceipt }) {
             />
           </div>
 
-          <div className="flex items-center gap-3 pt-1">
-            <Switch data-testid="txn-print" checked={printReceipt} onCheckedChange={setPrintReceipt} />
-            <span className="text-sm">Print receipt on confirm</span>
-          </div>
+          {isCash && (
+            <div className="flex items-center gap-3 pt-1">
+              <Switch data-testid="txn-print" checked={printReceipt} onCheckedChange={setPrintReceipt} />
+              <span className="text-sm">Print receipt on confirm</span>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
@@ -165,7 +216,7 @@ export default function TransactionDialog({ type, onClose, onReceipt }) {
           <Button
             data-testid="txn-confirm"
             onClick={submit}
-            disabled={busy || !staffId}
+            disabled={!canConfirm}
             className="bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-40"
           >
             {busy ? "Recording…" : "Confirm"}

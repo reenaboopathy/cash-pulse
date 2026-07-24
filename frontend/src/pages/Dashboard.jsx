@@ -7,6 +7,7 @@ import ShiftControl from "@/components/ShiftControl";
 import SettingsDialog from "@/components/SettingsDialog";
 import ReportsDialog from "@/components/ReportsDialog";
 import StaffManagerDialog from "@/components/StaffManagerDialog";
+import BanksDialog from "@/components/BanksDialog";
 import ReceiptPreview from "@/components/ReceiptPreview";
 import { useStore } from "@/hooks/useStore";
 import { Cable, AlertCircle } from "lucide-react";
@@ -16,8 +17,11 @@ export default function Dashboard() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [staffOpen, setStaffOpen] = useState(false);
+  const [banksOpen, setBanksOpen] = useState(false);
   const [lastReceipt, setLastReceipt] = useState(null);
   const { shift, drawerConnected } = useStore();
+
+  const cashDisabled = !shift || !drawerConnected;
 
   return (
     <div className="min-h-screen text-foreground">
@@ -25,10 +29,10 @@ export default function Dashboard() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenReports={() => setReportsOpen(true)}
         onOpenStaff={() => setStaffOpen(true)}
+        onOpenBanks={() => setBanksOpen(true)}
       />
 
       <main className="mx-auto max-w-[1600px] px-6 py-8 space-y-6">
-        {/* Connection banner — visible when drawer is not connected */}
         {!drawerConnected && (
           <div
             data-testid="disconnected-banner"
@@ -38,8 +42,7 @@ export default function Dashboard() {
             <div className="flex-1">
               <div className="text-sm font-semibold text-amber-300">Cash drawer not connected</div>
               <div className="text-xs text-muted-foreground mt-1">
-                SELTRACK is in <b className="text-amber-300">read-only mode</b>. You can view reports, but you can&apos;t open/close a shift
-                or record transactions until you pair your printer &amp; drawer.
+                Cash transactions are locked. <b className="text-amber-300">UPI / Bank</b> transactions still work — they don&apos;t need the drawer.
               </div>
             </div>
             <Button
@@ -52,16 +55,15 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 1. Quick Actions — TOP */}
-        <QuickActions onReceipt={setLastReceipt} disabled={!shift || !drawerConnected} />
+        {/* Quick Actions TOP */}
+        <QuickActions onReceipt={setLastReceipt} disabled={cashDisabled} />
 
-        {/* 2. Balance Card + Shift Control — side by side, near the drawer */}
+        {/* Balance + Shift Control */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <BalanceCard />
           <ShiftControl />
         </section>
 
-        {/* Optional receipt preview slot */}
         {lastReceipt && (
           <ReceiptPreview
             txn={lastReceipt.txn}
@@ -71,13 +73,14 @@ export default function Dashboard() {
           />
         )}
 
-        {/* 3. Transaction Feed — BOTTOM */}
+        {/* Transaction Feed BOTTOM */}
         <TransactionLog />
       </main>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <ReportsDialog open={reportsOpen} onOpenChange={setReportsOpen} />
       <StaffManagerDialog open={staffOpen} onOpenChange={setStaffOpen} />
+      <BanksDialog open={banksOpen} onOpenChange={setBanksOpen} />
     </div>
   );
 }

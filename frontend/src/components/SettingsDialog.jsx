@@ -3,27 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { printer } from "@/lib/printer";
 import { useStore } from "@/hooks/useStore";
-import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Usb, Cable, Zap, X, Eraser, AlertTriangle } from "lucide-react";
+import { Usb, Cable, Zap, X, AlertTriangle } from "lucide-react";
 
 export default function SettingsDialog({ open, onOpenChange }) {
-  const { drawerConnected, drawerInfo, setDrawerState, refreshAll } = useStore();
+  const { drawerConnected, drawerInfo, setDrawerState } = useStore();
   const [busy, setBusy] = useState(false);
-
-  const resetData = async () => {
-    if (!window.confirm("Erase ALL transactions, shifts, and receipt counters? Staff will be preserved. This cannot be undone.")) return;
-    setBusy(true);
-    try {
-      const res = await api.admin.reset(true);
-      await refreshAll();
-      toast.success(`Cleared ${res.transactions_deleted} txns, ${res.shifts_deleted} shifts.`);
-    } catch (e) {
-      toast.error(e?.response?.data?.detail || "Reset failed");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const doSerial = async () => {
     setBusy(true);
@@ -199,15 +184,14 @@ export default function SettingsDialog({ open, onOpenChange }) {
             <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground mb-2">Danger zone</div>
             <Button
               data-testid="reset-data-btn"
-              onClick={resetData}
-              disabled={busy}
+              disabled
               variant="outline"
-              className="w-full border-rose-500/40 text-rose-400 hover:bg-rose-500/10"
+              className="w-full border-rose-500/20 text-rose-400/50 cursor-not-allowed"
             >
-              <Eraser className="h-4 w-4 mr-2" /> Clear All Transactions &amp; Shifts
+              <AlertTriangle className="h-4 w-4 mr-2" /> Clear Data — Admin Only
             </Button>
             <div className="text-xs text-muted-foreground mt-1">
-              Removes every recorded transaction, shift, and receipt counter. Staff list is preserved. Requires no open shift.
+              Restricted to the <b className="text-amber-400">Admin Console</b> (login + PIN).
             </div>
           </div>
         </div>

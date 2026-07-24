@@ -6,31 +6,27 @@ const StoreCtx = createContext(null);
 
 export function StoreProvider({ children }) {
   const [staff, setStaff] = useState([]);
-  const [activeStaffId, setActiveStaffId] = useState(() => localStorage.getItem("seltrack:staffId") || "");
   const [shift, setShift] = useState(null);
   const [balance, setBalance] = useState(0);
-  const [totals, setTotals] = useState({ IN: 0, OUT: 0, ADJUSTMENT: 0 });
+  const [totalsByMethod, setTotalsByMethod] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [banks, setBanks] = useState([]);
   const [drawerConnected, setDrawerConnected] = useState(false);
   const [drawerInfo, setDrawerInfo] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const activeStaff = staff.find((s) => s.id === activeStaffId) || null;
-
   const refreshStaff = useCallback(async () => {
     const list = await api.staff.list();
     setStaff(list);
-    if (!activeStaffId && list[0]) {
-      setActiveStaffId(list[0].id);
-    }
     return list;
-  }, [activeStaffId]);
+  }, []);
 
   const refreshShift = useCallback(async () => {
     const data = await api.shifts.current();
     setShift(data.shift);
     setBalance(data.balance);
-    setTotals(data.totals);
+    setTotalsByMethod(data.totals_by_method);
+    if (data.banks) setBanks(data.banks);
     return data;
   }, []);
 
@@ -40,9 +36,15 @@ export function StoreProvider({ children }) {
     return list;
   }, []);
 
+  const refreshBanks = useCallback(async () => {
+    const list = await api.banks.list();
+    setBanks(list);
+    return list;
+  }, []);
+
   const refreshAll = useCallback(async () => {
-    await Promise.all([refreshShift(), refreshTransactions()]);
-  }, [refreshShift, refreshTransactions]);
+    await Promise.all([refreshShift(), refreshTransactions(), refreshBanks()]);
+  }, [refreshShift, refreshTransactions, refreshBanks]);
 
   useEffect(() => {
     (async () => {
@@ -51,16 +53,13 @@ export function StoreProvider({ children }) {
         await refreshStaff();
         await refreshShift();
         await refreshTransactions();
+        await refreshBanks();
       } finally {
         setLoading(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (activeStaffId) localStorage.setItem("seltrack:staffId", activeStaffId);
-  }, [activeStaffId]);
 
   const setDrawerState = useCallback(() => {
     setDrawerConnected(printer.isConnected);
@@ -69,13 +68,11 @@ export function StoreProvider({ children }) {
 
   const value = {
     staff,
-    activeStaffId,
-    setActiveStaffId,
-    activeStaff,
     shift,
     balance,
-    totals,
+    totalsByMethod,
     transactions,
+    banks,
     loading,
     drawerConnected,
     drawerInfo,
@@ -83,6 +80,7 @@ export function StoreProvider({ children }) {
     refreshStaff,
     refreshShift,
     refreshTransactions,
+    refreshBanks,
     refreshAll,
   };
 

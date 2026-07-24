@@ -4,8 +4,9 @@ import { INR } from "@/lib/api";
 import { ArrowDownRight, ArrowUpRight, Wrench } from "lucide-react";
 
 export default function BalanceCard() {
-  const { balance, totals, shift } = useStore();
+  const { balance, totalsByMethod, shift } = useStore();
   const open = !!shift;
+  const cash = totalsByMethod?.CASH || { IN: 0, OUT: 0, ADJUSTMENT: 0 };
 
   return (
     <div data-testid="balance-card" className="rounded-lg border border-border bg-[#111827] p-6">
@@ -35,9 +36,9 @@ export default function BalanceCard() {
       </div>
 
       <div className="mt-6 grid grid-cols-3 gap-3">
-        <Metric label="IN" value={totals.IN} tone="in" icon={<ArrowDownRight className="h-4 w-4" />} testid="total-in" />
-        <Metric label="OUT" value={totals.OUT} tone="out" icon={<ArrowUpRight className="h-4 w-4" />} testid="total-out" />
-        <Metric label="ADJ" value={totals.ADJUSTMENT} tone="adj" icon={<Wrench className="h-4 w-4" />} testid="total-adj" />
+        <Metric label="Cash IN" value={cash.IN} tone="in" icon={<ArrowDownRight className="h-4 w-4" />} testid="total-in" />
+        <Metric label="Cash OUT" value={cash.OUT} tone="out" icon={<ArrowUpRight className="h-4 w-4" />} testid="total-out" />
+        <Metric label="Cash ADJ" value={cash.ADJUSTMENT} tone="adj" icon={<Wrench className="h-4 w-4" />} testid="total-adj" />
       </div>
     </div>
   );
