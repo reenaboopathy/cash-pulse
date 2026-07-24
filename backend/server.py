@@ -47,6 +47,11 @@ class StaffCreate(BaseModel):
     name: str
     role: str = "Cashier"
 
+class StaffUpdate(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    active: Optional[bool] = None
+
 class Denominations(BaseModel):
     d500: int = 0
     d200: int = 0
@@ -158,6 +163,45 @@ async def create_staff(payload: StaffCreate):
     s = Staff(**payload.model_dump())
     await db.staff.insert_one(s.model_dump())
     return s
+
+@api_router.patch("/staff/{staff_id}", response_model=Staff)
+async def update_staff(staff_id: str, payload: StaffUpdate):
+    updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(400, "No fields to update")
+    res = await db.staff.update_one({"id": staff_id}, {"$set": updates})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Staff not found")
+    doc = await db.staff.find_one({"id": staff_id}, {"_id": 0})
+    return doc
+
+@api_router.delete("/staff/{staff_id}")
+async def delete_staff(staff_id: str):
+    # Soft delete (mark inactive). Preserves historical records referencing this staff.
+    res = await db.staff.update_one({"id": staff_id}, {"$set": {"active": False}})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Staff not found")
+    return {"ok": True, "id": staff_id}
+
+@api_router.post("/admin/reset")
+async def reset_data(keep_staff: bool = True):
+    """Clear all transactions, shifts, and receipt counters. Staff preserved by default."""
+    open_shift = await get_open_shift()
+    if open_shift:
+        raise HTTPException(400, "Close the open shift before resetting data.")
+    t = await db.transactions.delete_many({})
+    s = await db.shifts.delete_many({})
+    c = await db.counters.delete_many({})
+    st = 0
+    if not keep_staff:
+        r = await db.staff.delete_many({})
+        st = r.deleted_count
+    return {
+        "transactions_deleted": t.deleted_count,
+        "shifts_deleted": s.deleted_count,
+        "counters_deleted": c.deleted_count,
+        "staff_deleted": st,
+    }
 
 # Shifts
 @api_router.get("/shifts/current")

@@ -9,6 +9,11 @@ export const api = {
   staff: {
     list: () => http.get("/staff").then((r) => r.data),
     create: (body) => http.post("/staff", body).then((r) => r.data),
+    update: (id, body) => http.patch(`/staff/${id}`, body).then((r) => r.data),
+    remove: (id) => http.delete(`/staff/${id}`).then((r) => r.data),
+  },
+  admin: {
+    reset: (keepStaff = true) => http.post(`/admin/reset?keep_staff=${keepStaff}`).then((r) => r.data),
   },
   shifts: {
     current: () => http.get("/shifts/current").then((r) => r.data),

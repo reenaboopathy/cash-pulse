@@ -6,12 +6,14 @@ import QuickActions from "@/components/QuickActions";
 import ShiftControl from "@/components/ShiftControl";
 import SettingsDialog from "@/components/SettingsDialog";
 import ReportsDialog from "@/components/ReportsDialog";
+import StaffManagerDialog from "@/components/StaffManagerDialog";
 import ReceiptPreview from "@/components/ReceiptPreview";
 import { useStore } from "@/hooks/useStore";
 
 export default function Dashboard() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
+  const [staffOpen, setStaffOpen] = useState(false);
   const [lastReceipt, setLastReceipt] = useState(null);
   const { shift } = useStore();
 
@@ -20,6 +22,7 @@ export default function Dashboard() {
       <TopNav
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenReports={() => setReportsOpen(true)}
+        onOpenStaff={() => setStaffOpen(true)}
       />
 
       <main className="mx-auto max-w-[1600px] px-6 py-8">
@@ -43,6 +46,7 @@ export default function Dashboard() {
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <ReportsDialog open={reportsOpen} onOpenChange={setReportsOpen} />
+      <StaffManagerDialog open={staffOpen} onOpenChange={setStaffOpen} />
     </div>
   );
 }

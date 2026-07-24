@@ -2,9 +2,9 @@ import React from "react";
 import { useStore } from "@/hooks/useStore";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Settings2, FileBarChart, Radio } from "lucide-react";
+import { Settings2, FileBarChart, Radio, Users } from "lucide-react";
 
-export default function TopNav({ onOpenSettings, onOpenReports }) {
+export default function TopNav({ onOpenSettings, onOpenReports, onOpenStaff }) {
   const { staff, activeStaffId, setActiveStaffId, drawerConnected, drawerInfo } = useStore();
 
   return (
@@ -58,6 +58,14 @@ export default function TopNav({ onOpenSettings, onOpenReports }) {
             onClick={onOpenReports}
           >
             <FileBarChart className="h-4 w-4 mr-2" /> Reports
+          </Button>
+          <Button
+            data-testid="staff-btn"
+            variant="outline"
+            className="border-border bg-[#111827] hover:bg-[#1f2937]"
+            onClick={onOpenStaff}
+          >
+            <Users className="h-4 w-4 mr-2" /> Users
           </Button>
           <Button
             data-testid="settings-btn"
