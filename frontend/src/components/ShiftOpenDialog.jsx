@@ -32,7 +32,19 @@ export default function ShiftOpenDialog({ open, onOpenChange }) {
       return;
     }
     if (!printer.isConnected) {
-      toast.error("Cash drawer is not connected. Pair it in Devices before opening a shift.");
+      // Drawer offline — allow opening the shift without pulsing. Cash actions will stay locked
+      // until the drawer is connected; UPI/Bank actions work regardless.
+      setBusy(true);
+      try {
+        await api.shifts.open({ staff_id: activeStaff.id, denominations: denoms, note });
+        toast.success(`Shift opened (drawer offline) by ${activeStaff.name}`);
+        await refreshAll();
+        onOpenChange(false);
+      } catch (e) {
+        toast.error(e?.response?.data?.detail || e?.message || "Failed to open shift");
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     setBusy(true);

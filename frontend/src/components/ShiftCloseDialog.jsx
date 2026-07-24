@@ -33,34 +33,33 @@ export default function ShiftCloseDialog({ open, onOpenChange }) {
       toast.error("Select the user closing this shift.");
       return;
     }
-    if (!printer.isConnected) {
-      toast.error("Cash drawer is not connected. Pair it in Devices before closing.");
-      return;
-    }
     setBusy(true);
     try {
-      // Pulse drawer first so the cashier can physically verify the count
-      await printer.openDrawer();
+      // Pulse drawer only if connected — otherwise close without pulse (drawer offline case)
+      if (printer.isConnected) {
+        try { await printer.openDrawer(); } catch (_) { /* non-fatal */ }
+      }
       const closed = await api.shifts.close({ staff_id: activeStaff.id, denominations: denoms, note });
-      try {
-        await printer.printReceipt({
-          header: "Z-REPORT / SHIFT CLOSE",
-          lines: [
-            `Shift  : ${closed.id.slice(0, 8)}`,
-            `Opened : ${new Date(closed.opened_at).toLocaleString("en-IN")}`,
-            `Closed : ${new Date(closed.closed_at).toLocaleString("en-IN")}`,
-            `By     : ${closed.closed_by_name}`,
-            ``,
-            `Opening: INR ${closed.opening_amount.toFixed(2)}`,
-            `Expect : INR ${closed.expected_amount.toFixed(2)}`,
-            `Counted: INR ${closed.closing_amount.toFixed(2)}`,
-            `Var.   : INR ${closed.variance.toFixed(2)}`,
-          ],
-          openDrawer: false, // already pulsed above
-        });
-      } catch (e) {
-        // receipt failed but shift is closed — warn, don't fail the operation
-        toast.warning("Shift closed, but receipt failed to print.");
+      if (printer.isConnected) {
+        try {
+          await printer.printReceipt({
+            header: "Z-REPORT / SHIFT CLOSE",
+            lines: [
+              `Shift  : ${closed.id.slice(0, 8)}`,
+              `Opened : ${new Date(closed.opened_at).toLocaleString("en-IN")}`,
+              `Closed : ${new Date(closed.closed_at).toLocaleString("en-IN")}`,
+              `By     : ${closed.closed_by_name}`,
+              ``,
+              `Opening: INR ${closed.opening_amount.toFixed(2)}`,
+              `Expect : INR ${closed.expected_amount.toFixed(2)}`,
+              `Counted: INR ${closed.closing_amount.toFixed(2)}`,
+              `Var.   : INR ${closed.variance.toFixed(2)}`,
+            ],
+            openDrawer: false,
+          });
+        } catch (e) {
+          toast.warning("Shift closed, but receipt failed to print.");
+        }
       }
       toast.success(`Shift closed. Variance ${INR(closed.variance)}`);
       await refreshAll();

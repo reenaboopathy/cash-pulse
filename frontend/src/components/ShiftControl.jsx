@@ -4,21 +4,12 @@ import { Button } from "@/components/ui/button";
 import { INR } from "@/lib/api";
 import ShiftOpenDialog from "@/components/ShiftOpenDialog";
 import ShiftCloseDialog from "@/components/ShiftCloseDialog";
-import { LockOpen, LockKeyhole, Cable } from "lucide-react";
-import { toast } from "sonner";
+import { LockOpen, LockKeyhole } from "lucide-react";
 
 export default function ShiftControl() {
   const { shift, drawerConnected } = useStore();
   const [openDlg, setOpenDlg] = useState(false);
   const [closeDlg, setCloseDlg] = useState(false);
-
-  const guard = () => {
-    if (!drawerConnected) {
-      toast.error("Connect the cash drawer first. Open Devices → Web Serial / WebUSB.");
-      return false;
-    }
-    return true;
-  };
 
   return (
     <div className="rounded-lg border border-border bg-[#111827] p-5 flex flex-col justify-between h-full">
@@ -41,34 +32,31 @@ export default function ShiftControl() {
             #{shift.id.slice(0, 8)} · by {shift.opened_by_name}
           </div>
         )}
+        {!drawerConnected && (
+          <div className="text-xs text-amber-400/80 mt-2">
+            Drawer offline — shift opens without a pulse. Cash actions stay locked until you connect the drawer.
+          </div>
+        )}
       </div>
 
       <div className="mt-4">
         {shift ? (
           <Button
             data-testid="close-shift-btn"
-            className="w-full bg-rose-500 hover:bg-rose-400 text-white font-semibold disabled:opacity-40"
-            onClick={() => guard() && setCloseDlg(true)}
-            disabled={!drawerConnected}
+            className="w-full bg-rose-500 hover:bg-rose-400 text-white font-semibold"
+            onClick={() => setCloseDlg(true)}
           >
-            {drawerConnected ? (
-              <><LockKeyhole className="h-4 w-4 mr-2" /> Close Shift &amp; Pulse Drawer</>
-            ) : (
-              <><Cable className="h-4 w-4 mr-2" /> Connect drawer to close</>
-            )}
+            <LockKeyhole className="h-4 w-4 mr-2" />
+            {drawerConnected ? "Close Shift & Pulse Drawer" : "Close Shift"}
           </Button>
         ) : (
           <Button
             data-testid="open-shift-btn"
-            className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-40"
-            onClick={() => guard() && setOpenDlg(true)}
-            disabled={!drawerConnected}
+            className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold"
+            onClick={() => setOpenDlg(true)}
           >
-            {drawerConnected ? (
-              <><LockOpen className="h-4 w-4 mr-2" /> Open Shift &amp; Pulse Drawer</>
-            ) : (
-              <><Cable className="h-4 w-4 mr-2" /> Connect drawer to open</>
-            )}
+            <LockOpen className="h-4 w-4 mr-2" />
+            {drawerConnected ? "Open Shift & Pulse Drawer" : "Open Shift"}
           </Button>
         )}
       </div>

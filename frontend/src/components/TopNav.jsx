@@ -3,9 +3,9 @@ import { Link } from "react-router-dom";
 import { useStore } from "@/hooks/useStore";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Settings2, FileBarChart, Radio, Users, Landmark, ShieldCheck } from "lucide-react";
+import { Settings2, FileBarChart, Radio, ShieldCheck } from "lucide-react";
 
-export default function TopNav({ onOpenSettings, onOpenReports, onOpenStaff, onOpenBanks }) {
+export default function TopNav({ onOpenSettings, onOpenReports }) {
   const { drawerConnected, drawerInfo } = useStore();
   const { admin } = useAuth();
 
@@ -36,14 +36,8 @@ export default function TopNav({ onOpenSettings, onOpenReports, onOpenStaff, onO
         </div>
 
         <div className="ml-auto flex items-center gap-2 flex-wrap">
-          <Button data-testid="banks-btn" variant="outline" size="sm" className="border-border bg-[#111827] hover:bg-[#1f2937]" onClick={onOpenBanks}>
-            <Landmark className="h-4 w-4 mr-2" /> Banks
-          </Button>
           <Button data-testid="reports-btn" variant="outline" size="sm" className="border-border bg-[#111827] hover:bg-[#1f2937]" onClick={onOpenReports}>
             <FileBarChart className="h-4 w-4 mr-2" /> Reports
-          </Button>
-          <Button data-testid="staff-btn" variant="outline" size="sm" className="border-border bg-[#111827] hover:bg-[#1f2937]" onClick={onOpenStaff}>
-            <Users className="h-4 w-4 mr-2" /> Users
           </Button>
           <Button data-testid="settings-btn" variant="outline" size="sm" className="border-border bg-[#111827] hover:bg-[#1f2937]" onClick={onOpenSettings}>
             <Settings2 className="h-4 w-4 mr-2" /> Devices

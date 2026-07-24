@@ -4,8 +4,9 @@ import { useNavigate, Link } from "react-router-dom";
 import { api, INR, apiErrorText } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Banknote, Smartphone, Landmark, LogOut, KeyRound, Eraser, TrendingUp, TrendingDown, Wrench, RefreshCw, Store } from "lucide-react";
+import { Banknote, Smartphone, Landmark, LogOut, KeyRound, Eraser, TrendingUp, TrendingDown, Wrench, RefreshCw, Store, Users as UsersIcon } from "lucide-react";
 import BanksDialog from "@/components/BanksDialog";
+import StaffManagerDialog from "@/components/StaffManagerDialog";
 import ReportsDialog from "@/components/ReportsDialog";
 import PinPrompt from "@/components/PinPrompt";
 import ChangeCredentialsDialog from "@/components/ChangeCredentialsDialog";
@@ -15,6 +16,7 @@ export default function AdminDashboard() {
   const nav = useNavigate();
   const [data, setData] = useState(null);
   const [banksOpen, setBanksOpen] = useState(false);
+  const [usersOpen, setUsersOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [credsOpen, setCredsOpen] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
@@ -82,6 +84,9 @@ export default function AdminDashboard() {
             </Button>
             <Button data-testid="admin-banks-btn" onClick={() => setBanksOpen(true)} variant="outline" size="sm" className="border-border">
               <Landmark className="h-3.5 w-3.5 mr-1" /> Banks
+            </Button>
+            <Button data-testid="admin-users-btn" onClick={() => setUsersOpen(true)} variant="outline" size="sm" className="border-border">
+              <UsersIcon className="h-3.5 w-3.5 mr-1" /> Users
             </Button>
             <Button data-testid="admin-creds-btn" onClick={() => setCredsOpen(true)} variant="outline" size="sm" className="border-border">
               <KeyRound className="h-3.5 w-3.5 mr-1" /> Credentials
@@ -241,6 +246,7 @@ export default function AdminDashboard() {
       </main>
 
       <BanksDialog open={banksOpen} onOpenChange={setBanksOpen} />
+      <StaffManagerDialog open={usersOpen} onOpenChange={setUsersOpen} />
       <ReportsDialog open={reportsOpen} onOpenChange={setReportsOpen} />
       <PinPrompt
         open={pinOpen}

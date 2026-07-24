@@ -361,13 +361,13 @@ async def list_staff():
     return await db.staff.find({"active": True}, {"_id": 0}).sort("name", 1).to_list(500)
 
 @api_router.post("/staff", response_model=Staff)
-async def create_staff(payload: StaffCreate):
+async def create_staff(payload: StaffCreate, admin: dict = Depends(get_current_admin)):
     s = Staff(**payload.model_dump())
     await db.staff.insert_one(s.model_dump())
     return s
 
 @api_router.patch("/staff/{staff_id}", response_model=Staff)
-async def update_staff(staff_id: str, payload: StaffUpdate):
+async def update_staff(staff_id: str, payload: StaffUpdate, admin: dict = Depends(get_current_admin)):
     updates = {k: v for k, v in payload.model_dump().items() if v is not None}
     if not updates:
         raise HTTPException(400, "No fields to update")
@@ -377,7 +377,7 @@ async def update_staff(staff_id: str, payload: StaffUpdate):
     return await db.staff.find_one({"id": staff_id}, {"_id": 0})
 
 @api_router.delete("/staff/{staff_id}")
-async def delete_staff(staff_id: str):
+async def delete_staff(staff_id: str, admin: dict = Depends(get_current_admin)):
     res = await db.staff.update_one({"id": staff_id}, {"$set": {"active": False}})
     if res.matched_count == 0:
         raise HTTPException(404, "Staff not found")
