@@ -31,16 +31,20 @@ export default function ShiftOpenDialog({ open, onOpenChange }) {
       toast.error("Select the user opening this shift.");
       return;
     }
+    if (!printer.isConnected) {
+      toast.error("Cash drawer is not connected. Pair it in Devices before opening a shift.");
+      return;
+    }
     setBusy(true);
     try {
+      // Pulse the drawer FIRST — if the hardware fails, we don't record a fake shift
+      await printer.openDrawer();
       await api.shifts.open({ staff_id: activeStaff.id, denominations: denoms, note });
-      // Pulse drawer on open
-      try { if (printer.isConnected) await printer.openDrawer(); } catch (e) { /* ignore */ }
       toast.success(`Shift opened by ${activeStaff.name}`);
       await refreshAll();
       onOpenChange(false);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Failed to open shift");
+      toast.error(e?.response?.data?.detail || e?.message || "Failed to open shift");
     } finally {
       setBusy(false);
     }

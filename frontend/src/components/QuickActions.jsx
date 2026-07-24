@@ -2,8 +2,10 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowDownRight, ArrowUpRight, Wrench } from "lucide-react";
 import TransactionDialog from "@/components/TransactionDialog";
+import { useStore } from "@/hooks/useStore";
 
 export default function QuickActions({ onReceipt, disabled }) {
+  const { shift } = useStore();
   const [type, setType] = useState(null);
 
   return (
@@ -47,7 +49,9 @@ export default function QuickActions({ onReceipt, disabled }) {
         </Button>
       </div>
       {disabled && (
-        <div className="mt-3 text-xs text-muted-foreground">Open a shift to record transactions.</div>
+        <div data-testid="quick-actions-hint" className="mt-3 text-xs text-muted-foreground">
+          {shift ? "Connect the cash drawer in Devices to record transactions." : "Open a shift to record transactions."}
+        </div>
       )}
 
       <TransactionDialog type={type} onClose={() => setType(null)} onReceipt={onReceipt} />

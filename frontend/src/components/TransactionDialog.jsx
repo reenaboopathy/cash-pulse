@@ -57,8 +57,28 @@ export default function TransactionDialog({ type, onClose, onReceipt }) {
       toast.error("Enter a non-zero adjustment amount (use negative for missing cash).");
       return;
     }
+    if (!printer.isConnected) {
+      toast.error("Cash drawer is not connected. Pair it in Devices before recording transactions.");
+      return;
+    }
     setBusy(true);
     try {
+      // Pulse the drawer + print receipt FIRST — if the hardware fails, we don't record a phantom transaction
+      if (printReceipt) {
+        await printer.printReceipt({
+          header: `${type} · ${category}`,
+          lines: buildReceiptLines({
+            txn: { type, category, amount: amt, note, receipt_number: 0, created_at: new Date().toISOString() },
+            shift,
+            staffName: activeStaff.name,
+            balance: balance + (type === "IN" ? amt : type === "OUT" ? -amt : amt),
+          }),
+          openDrawer: true,
+        });
+      } else {
+        await printer.openDrawer();
+      }
+
       const txn = await api.transactions.create({
         type,
         category,
@@ -67,28 +87,12 @@ export default function TransactionDialog({ type, onClose, onReceipt }) {
         staff_id: activeStaff.id,
         drawer_opened: true,
       });
-      // Pulse drawer + print receipt
-      try {
-        if (printer.isConnected) {
-          if (printReceipt) {
-            await printer.printReceipt({
-              header: `${type} · ${category}`,
-              lines: buildReceiptLines({ txn, shift, staffName: activeStaff.name, balance: balance + (type === "IN" ? amt : type === "OUT" ? -amt : amt) }),
-              openDrawer: true,
-            });
-          } else {
-            await printer.openDrawer();
-          }
-        }
-      } catch (e) {
-        toast.warning("Recorded, but printer/drawer failed. Check Devices.");
-      }
       await refreshAll();
       onReceipt?.({ txn, shift, staffName: activeStaff.name, balance: balance + (type === "IN" ? amt : type === "OUT" ? -amt : amt) });
       toast.success(`${type} recorded · #${String(txn.receipt_number).padStart(4, "0")}`);
       onClose();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Failed to record transaction");
+      toast.error(e?.response?.data?.detail || e?.message || "Failed to record transaction");
     } finally {
       setBusy(false);
     }
