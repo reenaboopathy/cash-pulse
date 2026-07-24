@@ -55,16 +55,18 @@ export default function AdminDashboard() {
       <header className="sticky top-0 z-40 border-b border-border bg-[#0B1120]/85 backdrop-blur">
         <div className="mx-auto max-w-[1600px] px-6 py-4 flex items-center gap-6">
           <div className="flex items-center gap-3">
-            <img
-              src="https://customer-assets-v7afamib.emergentagent.net/job_cash-pulse-16/artifacts/n825jjwh_DTF%20STICKER%20PRINTING.png"
-              alt="SELTRACK"
-              className="h-12 w-12 object-contain"
-              data-testid="admin-logo"
-            />
-            <div>
-              <div className="text-2xl font-bold tracking-tight leading-none">SELTRACK</div>
+            <div className="bg-white rounded-lg px-3 py-1.5 shadow-sm">
+              <img
+                src="https://customer-assets-v7afamib.emergentagent.net/job_cash-pulse-16/artifacts/0pmr6wjy_DTF%20STICKER%20PRINTING%20%282%29.webp"
+                alt="SelSolve"
+                className="h-8 w-auto object-contain"
+                data-testid="admin-logo"
+              />
+            </div>
+            <div className="hidden sm:block border-l border-border pl-3">
+              <div className="text-xl font-semibold tracking-tight leading-none">Admin Console</div>
               <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-amber-400 mt-1">
-                Admin Console
+                Live overview
               </div>
             </div>
           </div>

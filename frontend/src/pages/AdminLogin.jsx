@@ -35,14 +35,16 @@ export default function AdminLogin() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <img
-            src="https://customer-assets-v7afamib.emergentagent.net/job_cash-pulse-16/artifacts/n825jjwh_DTF%20STICKER%20PRINTING.png"
-            alt="SELTRACK"
-            className="h-28 w-28 object-contain mb-4"
-            data-testid="login-logo"
-          />
-          <h1 className="text-4xl font-bold tracking-tight">SELTRACK</h1>
-          <p className="text-sm text-muted-foreground mt-2">Admin · Cash &amp; Bank Console</p>
+          <div className="bg-white rounded-2xl p-4 shadow-lg mb-5">
+            <img
+              src="https://customer-assets-v7afamib.emergentagent.net/job_cash-pulse-16/artifacts/oon08w84_DTF%20STICKER%20PRINTING%20%283%29.webp"
+              alt="SelSolve"
+              className="h-28 w-28 object-contain"
+              data-testid="login-logo"
+            />
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">Admin Login</h1>
+          <p className="text-sm text-muted-foreground mt-1">Cash &amp; Bank Console</p>
         </div>
 
         <form onSubmit={submit} className="rounded-lg border border-border bg-[#111827] p-6 space-y-4">
