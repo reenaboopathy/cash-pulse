@@ -70,7 +70,9 @@ export default function TransactionDialog({ type, defaultMethod = "CASH", onClos
       `txn-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     try {
       if (isCash) {
-        // Cash → drawer pulse + receipt BEFORE DB write
+        // 1) OPEN THE DRAWER FIRST so the cashier can accept/hand out cash immediately
+        await printer.openDrawer();
+        // 2) THEN print the receipt (without a second pulse)
         if (printReceipt) {
           await printer.printReceipt({
             header: `${type} · ${category}`,
@@ -80,10 +82,8 @@ export default function TransactionDialog({ type, defaultMethod = "CASH", onClos
               staffName: activeStaff.name,
               balance: balance + (type === "IN" ? amt : type === "OUT" ? -amt : amt),
             }),
-            openDrawer: true,
+            openDrawer: false,
           });
-        } else {
-          await printer.openDrawer();
         }
       }
       const txn = await api.transactions.create({
