@@ -1,11 +1,10 @@
 import React from "react";
 import { useStore } from "@/hooks/useStore";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Settings2, FileBarChart, Radio, Users } from "lucide-react";
 
 export default function TopNav({ onOpenSettings, onOpenReports, onOpenStaff }) {
-  const { staff, activeStaffId, setActiveStaffId, drawerConnected, drawerInfo } = useStore();
+  const { drawerConnected, drawerInfo } = useStore();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-[#0B1120]/85 backdrop-blur">
@@ -30,27 +29,6 @@ export default function TopNav({ onOpenSettings, onOpenReports, onOpenStaff }) {
         </div>
 
         <div className="ml-auto flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:block text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-              Active User
-            </span>
-            <Select value={activeStaffId} onValueChange={setActiveStaffId}>
-              <SelectTrigger data-testid="staff-dropdown" className="w-[200px] bg-[#111827] border-border">
-                <SelectValue placeholder="Select staff" />
-              </SelectTrigger>
-              <SelectContent>
-                {staff.map((s) => (
-                  <SelectItem key={s.id} value={s.id} data-testid={`staff-option-${s.id}`}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{s.name}</span>
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.role}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <Button
             data-testid="reports-btn"
             variant="outline"
