@@ -12,12 +12,11 @@ import { printer, buildReceiptLines } from "@/lib/printer";
 import { toast } from "sonner";
 import StaffPicker from "@/components/StaffPicker";
 import CategoryPicker from "@/components/CategoryPicker";
-import { Banknote, Smartphone, Landmark } from "lucide-react";
+import { Banknote, Smartphone } from "lucide-react";
 
 const METHODS = [
   { value: "CASH", label: "Cash", icon: Banknote },
-  { value: "UPI", label: "UPI", icon: Smartphone },
-  { value: "BANK", label: "Bank", icon: Landmark },
+  { value: "UPI", label: "UPI / Bank", icon: Smartphone },
 ];
 
 export default function TransactionDialog({ type, defaultMethod = "CASH", onClose, onReceipt }) {
@@ -134,7 +133,7 @@ export default function TransactionDialog({ type, defaultMethod = "CASH", onClos
           {/* Payment method */}
           <div>
             <Label className="text-xs uppercase tracking-widest text-muted-foreground">Payment method</Label>
-            <div className="mt-1 grid grid-cols-3 gap-2">
+            <div className="mt-1 grid grid-cols-2 gap-2">
               {METHODS.map(({ value, label, icon: Icon }) => (
                 <button
                   key={value}
@@ -156,9 +155,7 @@ export default function TransactionDialog({ type, defaultMethod = "CASH", onClos
 
           {requiresBank && (
             <div>
-              <Label className="text-xs uppercase tracking-widest text-muted-foreground">
-                {method === "UPI" ? "UPI account" : "Bank account"}
-              </Label>
+              <Label className="text-xs uppercase tracking-widest text-muted-foreground">UPI / Bank account</Label>
               <Select value={bankId} onValueChange={setBankId}>
                 <SelectTrigger data-testid="txn-bank" className="bg-[#0B1120] border-border mt-1">
                   <SelectValue placeholder="Select bank / UPI…" />

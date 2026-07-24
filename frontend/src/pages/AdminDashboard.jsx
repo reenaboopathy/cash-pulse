@@ -50,6 +50,7 @@ export default function AdminDashboard() {
 
   const methods = data.totals_by_method || { CASH: {}, UPI: {}, BANK: {} };
   const method = (m, t) => Number(methods?.[m]?.[t] || 0);
+  const bankLike = (t) => method("UPI", t) + method("BANK", t);
 
   return (
     <div className="min-h-screen">
@@ -113,7 +114,7 @@ export default function AdminDashboard() {
           <span className="font-mono">{data.today}</span>
         </div>
 
-        {/* Top row: Cash + UPI + Bank totals */}
+        {/* Top row: Cash + UPI/Bank + Bank Balances */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <BigCard
             testid="card-cash"
@@ -125,11 +126,11 @@ export default function AdminDashboard() {
           />
           <BigCard
             testid="card-upi"
-            title="UPI Today (Net)"
-            value={INR(method("UPI", "IN") - method("UPI", "OUT") + method("UPI", "ADJUSTMENT"))}
+            title="UPI / Bank Today (Net)"
+            value={INR(bankLike("IN") - bankLike("OUT") + bankLike("ADJUSTMENT"))}
             icon={Smartphone}
             tone="emerald"
-            sub={`IN ${INR(method("UPI", "IN"))} · OUT ${INR(method("UPI", "OUT"))}`}
+            sub={`IN ${INR(bankLike("IN"))} · OUT ${INR(bankLike("OUT"))}`}
           />
           <BigCard
             testid="card-bank-total"
@@ -187,17 +188,23 @@ export default function AdminDashboard() {
         {/* Method breakdown */}
         <section>
           <h2 className="text-lg font-semibold mb-3">Live Shift Totals</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {["CASH", "UPI", "BANK"].map((m) => (
-              <div key={m} data-testid={`method-card-${m}`} className="rounded-md border border-border bg-[#111827] p-4">
-                <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground">{m}</div>
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <MiniStat label="IN" value={method(m, "IN")} tone="text-emerald-400" icon={TrendingUp} />
-                  <MiniStat label="OUT" value={method(m, "OUT")} tone="text-rose-400" icon={TrendingDown} />
-                  <MiniStat label="ADJ" value={method(m, "ADJUSTMENT")} tone="text-amber-400" icon={Wrench} />
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div data-testid="method-card-CASH" className="rounded-md border border-border bg-[#111827] p-4">
+              <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground">CASH</div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <MiniStat label="IN" value={method("CASH", "IN")} tone="text-emerald-400" icon={TrendingUp} />
+                <MiniStat label="OUT" value={method("CASH", "OUT")} tone="text-rose-400" icon={TrendingDown} />
+                <MiniStat label="ADJ" value={method("CASH", "ADJUSTMENT")} tone="text-amber-400" icon={Wrench} />
               </div>
-            ))}
+            </div>
+            <div data-testid="method-card-UPI" className="rounded-md border border-border bg-[#111827] p-4">
+              <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground">UPI / BANK</div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <MiniStat label="IN" value={bankLike("IN")} tone="text-emerald-400" icon={TrendingUp} />
+                <MiniStat label="OUT" value={bankLike("OUT")} tone="text-rose-400" icon={TrendingDown} />
+                <MiniStat label="ADJ" value={bankLike("ADJUSTMENT")} tone="text-amber-400" icon={Wrench} />
+              </div>
+            </div>
           </div>
         </section>
 
@@ -224,8 +231,8 @@ export default function AdminDashboard() {
                   <div className="text-muted-foreground">
                     {new Date(t.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                   </div>
-                  <div className={t.payment_method === "CASH" ? "text-amber-400" : t.payment_method === "UPI" ? "text-emerald-400" : "text-sky-400"}>
-                    {t.payment_method || "CASH"}
+                  <div className={t.payment_method === "CASH" ? "text-amber-400" : "text-emerald-400"}>
+                    {t.payment_method === "CASH" ? "CASH" : "UPI/BANK"}
                   </div>
                   <div className="text-slate-200 truncate">
                     <span className={`mr-2 px-1.5 py-0.5 rounded ${t.type === "IN" ? "bg-emerald-500/15 text-emerald-400" : t.type === "OUT" ? "bg-rose-500/15 text-rose-400" : "bg-amber-500/15 text-amber-400"}`}>
