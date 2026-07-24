@@ -1,0 +1,123 @@
+{
+  "project_name": "SELTRACK",
+  "app_type": "POS Dashboard / Cash Tracking Single-Page App",
+  "theme_mode": "dark",
+  "typography": {
+    "font_family": {
+      "heading": "IBM Plex Sans",
+      "body": "IBM Plex Sans",
+      "mono": "JetBrains Mono"
+    },
+    "rules": {
+      "headings": "Tight letter spacing (tracking-tight). Use IBM Plex Sans for robust, professional readability.",
+      "numbers_and_data": "MANDATORY: All currency, balances, receipt previews, transaction amounts, and reports MUST use JetBrains Mono (font-mono) with tabular-nums.",
+      "hierarchy": {
+        "h1_balance": "text-6xl sm:text-7xl font-mono font-medium tracking-tighter",
+        "h2_section": "text-2xl sm:text-3xl font-semibold tracking-tight",
+        "ui_labels": "text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground",
+        "body": "text-sm sm:text-base font-medium"
+      }
+    }
+  },
+  "colors": {
+    "background": "Deep Navy/Charcoal (#0B1120) - avoids harsh pure black while reducing glare.",
+    "surface": "Elevated Navy (#111827) with subtle 1px inner borders (#1F2937).",
+    "primary": "Warning Amber (#F59E0B) - used for primary actions, drawer testing, and active statuses.",
+    "text": {
+      "primary": "Off-white (#F9FAFB)",
+      "secondary": "Slate Gray (#9CA3AF)"
+    },
+    "functional": {
+      "payment_in": "Mint Green (#10B981) - for positive cash flow and top-ups.",
+      "payment_out": "Rose/Crimson (#E11D48) - for expenses and payouts.",
+      "drawer_open": "Warning Amber (#F59E0B)",
+      "drawer_closed": "Slate Gray (#6B7280)"
+    },
+    "rules": [
+      "CRITICAL: No generic purple gradients. No soft shadows. Use 1px solid borders to define surfaces.",
+      "High contrast is mandatory for retail lighting.",
+      "Use transparency (e.g., bg-emerald-500/10 text-emerald-500) for IN/OUT transaction badges rather than flat colors.",
+      "CRITICAL: DO NOT use complete transparent background in header, overlays, any surface that has content under it."
+    ]
+  },
+  "layouts": {
+    "strategy": "The High Density Grid (Mode B for Dashboards)",
+    "structure": "Fixed Top Navigation bar + Split screen dashboard. Left side (40%): Transaction Log & Live Feed. Right side (60%): Massive Live Balance, Quick Actions, and Denomination Grid.",
+    "spacing": "Dense but clear. Use p-4 to p-6 inside cards. gap-4 for grids. Elements must feel physically close to minimize mouse/eye travel.",
+    "borders": "Grid Borders Look: Expose the skeleton. Use solid 1px borders (border-border) to define functional areas.",
+    "surfaces": "Flat solid surfaces. NO glassmorphism on data cards to prevent visual refraction. Maximum border radius: 8px (rounded-md)."
+  },
+  "components_guidance": {
+    "top_bar": {
+      "description": "Solid background (bg-[#111827]) with a hard bottom border. Contains SELTRACK logo and the Staff Dropdown.",
+      "staff_dropdown": "Simple Shadcn Select component customized for high contrast. No password. Just predefined staff names. Use large click targets for touch/fast usage."
+    },
+    "live_balance_card": {
+      "description": "The hero component. A massive, undeniable truth of the current cash drawer state.",
+      "style": "JetBrains Mono. Stark white text. 1px border. Do not center; align left or top-right depending on the grid cell. Format: ₹ XX,XXX.XX"
+    },
+    "transaction_rows": {
+      "description": "Chronological feed of IN, OUT, and Adjustments.",
+      "style": "CSS Grid for perfect column alignment. Date/Time (muted, small), User (truncate), Type (Badge), Amount (JetBrains Mono, aligned right). Hover state: background slightly lighter (hover:bg-white/5) with explicit text color."
+    },
+    "denomination_counter": {
+      "description": "Grid of inputs for Shift Open/Close and Adjustments for INR notes (500, 200, 100, 50, 20, 10, coins).",
+      "style": "Bento 2-column grid. Left: Note label (e.g., ₹500). Right: Input field. Must auto-calculate total in real-time with mono font."
+    },
+    "drawer_status_indicator": {
+      "description": "Visual indicator of the physical cash drawer state.",
+      "style": "Small badge near the top or balance. 'CLOSED' is dim/gray. 'OPEN' is bright amber with a pulsing animation (animate-pulse on a dot)."
+    },
+    "receipt_preview": {
+      "description": "Preview of the ESC/POS thermal printout.",
+      "style": "MANDATORY: Paper-white background (#FFFFFF), ink-black text (#000000). 100% JetBrains Mono. Uppercase text. Dashed top/bottom borders to mimic receipt cuts. This MUST look like a literal receipt, providing intentional harsh contrast to the dark app theme."
+    },
+    "settings_modal": {
+      "description": "Modal for Web Serial / WebUSB printer & drawer device pairing.",
+      "style": "Technical styling. Use monospace fonts for device addresses. Include a highly visible 'Test Drawer' button (Amber) that pulses on click."
+    },
+    "reports_view": {
+      "description": "Daily Z-report / X-report style summaries.",
+      "style": "Dense tabular layout. Show expected vs actual variance in red/green. Provide clear CSV/PDF export buttons."
+    }
+  },
+  "motion": {
+    "philosophy": "Instant and functional. Retail workers need speed, not long animations.",
+    "rules": [
+      "Hover states: fast 150ms transitions.",
+      "Drawer Open pulse: use standard Tailwind animate-pulse for the status dot.",
+      "Number counting: Do NOT animate the live balance counting up/down. Instant, deterministic updates are required for POS accuracy."
+    ]
+  },
+  "visual_enhancers": {
+    "icons": "Use Phosphor Icons (@phosphor-icons/react) with Duotone weight for actions, or Bold weights for high visibility in buttons.",
+    "textures": "Optional subtle noise on the dark background to reduce screen glare and make the interface feel tactile like a physical register."
+  },
+  "accessibility": {
+    "contrast": "Strict APCA/WCAG AA adherence. Ensure amber/green/red text on dark backgrounds uses lighter shades (e.g., 400 or 500 scale) to remain readable.",
+    "keyboard": "MANDATORY: Complete keyboard navigation. Forms, inputs, and Shift Close modals must be fully navigable via Tab and Enter keys for fast POS entry.",
+    "testing": "All interactive elements MUST include data-testid. Example: data-testid='staff-dropdown', data-testid='payment-in-btn'."
+  },
+  "instructions_to_main_agent": [
+    "Install dependencies: yarn add @phosphor-icons/react lucide-react clsx tailwind-merge date-fns",
+    "Configure Tailwind: Setup the dark navy and amber palette in tailwind.config.js mapping primary to Amber 500, background to Deep Navy (#0B1120), surface to Elevated Navy (#111827).",
+    "Fonts: Import IBM Plex Sans and JetBrains Mono via Google Fonts in index.css.",
+    "Build standard Shadcn components in src/components/ui: Button, Select, Dialog, Card, Badge, Input, Table. Ensure these are JS files, not TSX.",
+    "Structure the layout: Create a TopNav and a main Dashboard Layout using CSS Grid to map to the 40/60 split.",
+    "Implement the Denomination logic state: controlled inputs mapping to 500, 200, 100, 50, 20, 10, coins and calculating a sum.",
+    "Create the Receipt Preview component with stark white background and black mono text to emulate thermal printing.",
+    "Ensure the drawer connection functions map to Web Serial / WebUSB API correctly."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic outputs. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms. Always add transitions for specific interactive elements.",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Every interaction needs micro-animations - hover states, transitions, entrance animations. Static = dead.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Use sonner for toasts. Sonner component are located in /app/frontend/src/components/ui/sonner.js",
+    "NEVER use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons."
+  ]
+}
