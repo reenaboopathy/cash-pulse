@@ -35,11 +35,14 @@ export default function AdminLogin() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <div className="h-14 w-14 rounded-lg bg-amber-500 flex items-center justify-center mb-3">
-            <ShieldCheck className="h-7 w-7 text-black" />
-          </div>
-          <h1 className="text-3xl font-semibold tracking-tight">Admin Login</h1>
-          <p className="text-sm text-muted-foreground mt-1">SELTRACK · Cash &amp; Bank Console</p>
+          <img
+            src="https://customer-assets-v7afamib.emergentagent.net/job_cash-pulse-16/artifacts/n825jjwh_DTF%20STICKER%20PRINTING.png"
+            alt="SELTRACK"
+            className="h-28 w-28 object-contain mb-4"
+            data-testid="login-logo"
+          />
+          <h1 className="text-4xl font-bold tracking-tight">SELTRACK</h1>
+          <p className="text-sm text-muted-foreground mt-2">Admin · Cash &amp; Bank Console</p>
         </div>
 
         <form onSubmit={submit} className="rounded-lg border border-border bg-[#111827] p-6 space-y-4">

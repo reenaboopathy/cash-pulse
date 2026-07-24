@@ -13,11 +13,14 @@ export default function TopNav({ onOpenSettings, onOpenReports, onOpenStaff, onO
     <header className="sticky top-0 z-40 border-b border-border bg-[#0B1120]/85 backdrop-blur">
       <div className="mx-auto max-w-[1600px] px-6 py-4 flex items-center gap-6">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-md bg-amber-500 flex items-center justify-center">
-            <span className="font-mono text-black font-bold text-lg leading-none">S</span>
-          </div>
+          <img
+            src="https://customer-assets-v7afamib.emergentagent.net/job_cash-pulse-16/artifacts/n825jjwh_DTF%20STICKER%20PRINTING.png"
+            alt="SELTRACK"
+            className="h-12 w-12 object-contain"
+            data-testid="brand-logo"
+          />
           <div>
-            <div className="text-xl font-semibold tracking-tight leading-none">SELTRACK</div>
+            <div className="text-2xl font-bold tracking-tight leading-none">SELTRACK</div>
             <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground mt-1">
               Cash Register
             </div>
