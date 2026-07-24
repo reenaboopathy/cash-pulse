@@ -10,7 +10,7 @@ import { printer } from "@/lib/printer";
 import { toast } from "sonner";
 
 export default function ShiftOpenDialog({ open, onOpenChange }) {
-  const { staff, refreshAll } = useStore();
+  const { staff, refreshAll, drawerConnected } = useStore();
   const [denoms, setDenoms] = useState({ ...EMPTY_DENOM });
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -68,7 +68,8 @@ export default function ShiftOpenDialog({ open, onOpenChange }) {
         <DialogHeader>
           <DialogTitle>Open Shift</DialogTitle>
           <DialogDescription>
-            Count cash in the drawer and identify who is opening. Drawer will pulse open on confirm.
+            Count cash in the drawer and identify who is opening.{" "}
+            {drawerConnected ? "Drawer will pulse open on confirm." : "Drawer is offline — shift will open without a pulse."}
           </DialogDescription>
         </DialogHeader>
         <StaffPicker value={staffId} onChange={setStaffId} testid="open-staff" />
@@ -88,7 +89,7 @@ export default function ShiftOpenDialog({ open, onOpenChange }) {
             disabled={busy || !staffId || denomTotal(denoms) < 0}
             className="bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-40"
           >
-            {busy ? "Opening…" : "Confirm & Open Drawer"}
+            {busy ? "Opening…" : drawerConnected ? "Confirm & Open Drawer" : "Confirm & Open Shift"}
           </Button>
         </DialogFooter>
       </DialogContent>
