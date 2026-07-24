@@ -1,25 +1,36 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import DenominationGrid from "@/components/DenominationGrid";
+import StaffPicker from "@/components/StaffPicker";
 import { useStore } from "@/hooks/useStore";
 import { api, EMPTY_DENOM, denomTotal, INR } from "@/lib/api";
 import { printer } from "@/lib/printer";
 import { toast } from "sonner";
 
 export default function ShiftCloseDialog({ open, onOpenChange }) {
-  const { activeStaff, refreshAll, balance, shift } = useStore();
+  const { staff, refreshAll, balance, shift } = useStore();
   const [denoms, setDenoms] = useState({ ...EMPTY_DENOM });
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [staffId, setStaffId] = useState("");
 
+  useEffect(() => {
+    if (open) {
+      setDenoms({ ...EMPTY_DENOM });
+      setNote("");
+      setStaffId("");
+    }
+  }, [open]);
+
+  const activeStaff = staff.find((s) => s.id === staffId) || null;
   const counted = denomTotal(denoms);
   const variance = counted - balance;
 
   const submit = async () => {
     if (!activeStaff) {
-      toast.error("Select an active user first.");
+      toast.error("Select the user closing this shift.");
       return;
     }
     setBusy(true);
@@ -47,8 +58,6 @@ export default function ShiftCloseDialog({ open, onOpenChange }) {
       toast.success(`Shift closed. Variance ${INR(closed.variance)}`);
       await refreshAll();
       onOpenChange(false);
-      setDenoms({ ...EMPTY_DENOM });
-      setNote("");
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Failed to close shift");
     } finally {
@@ -62,10 +71,10 @@ export default function ShiftCloseDialog({ open, onOpenChange }) {
         <DialogHeader>
           <DialogTitle>Close Shift</DialogTitle>
           <DialogDescription>
-            Count remaining cash. Drawer pulses open for the count. User:{" "}
-            <span className="text-amber-400 font-medium">{activeStaff?.name || "—"}</span>
+            Count remaining cash and identify who is closing. Drawer pulses open for the count.
           </DialogDescription>
         </DialogHeader>
+        <StaffPicker value={staffId} onChange={setStaffId} testid="close-staff" />
         <DenominationGrid value={denoms} onChange={setDenoms} testidPrefix="close-denom" />
 
         <div className="grid grid-cols-3 gap-3 mt-2">
@@ -91,8 +100,8 @@ export default function ShiftCloseDialog({ open, onOpenChange }) {
           <Button
             data-testid="shift-close-confirm"
             onClick={submit}
-            disabled={busy || !shift}
-            className="bg-rose-500 hover:bg-rose-400 text-white font-semibold"
+            disabled={busy || !staffId || !shift}
+            className="bg-rose-500 hover:bg-rose-400 text-white font-semibold disabled:opacity-40"
           >
             {busy ? "Closing…" : "Confirm & Close"}
           </Button>

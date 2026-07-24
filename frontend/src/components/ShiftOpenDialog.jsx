@@ -1,22 +1,34 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import DenominationGrid from "@/components/DenominationGrid";
+import StaffPicker from "@/components/StaffPicker";
 import { useStore } from "@/hooks/useStore";
 import { api, EMPTY_DENOM, denomTotal } from "@/lib/api";
 import { printer } from "@/lib/printer";
 import { toast } from "sonner";
 
 export default function ShiftOpenDialog({ open, onOpenChange }) {
-  const { activeStaff, refreshAll } = useStore();
+  const { staff, refreshAll } = useStore();
   const [denoms, setDenoms] = useState({ ...EMPTY_DENOM });
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [staffId, setStaffId] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setDenoms({ ...EMPTY_DENOM });
+      setNote("");
+      setStaffId("");
+    }
+  }, [open]);
+
+  const activeStaff = staff.find((s) => s.id === staffId) || null;
 
   const submit = async () => {
     if (!activeStaff) {
-      toast.error("Select an active user first.");
+      toast.error("Select the user opening this shift.");
       return;
     }
     setBusy(true);
@@ -27,8 +39,6 @@ export default function ShiftOpenDialog({ open, onOpenChange }) {
       toast.success(`Shift opened by ${activeStaff.name}`);
       await refreshAll();
       onOpenChange(false);
-      setDenoms({ ...EMPTY_DENOM });
-      setNote("");
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Failed to open shift");
     } finally {
@@ -42,10 +52,10 @@ export default function ShiftOpenDialog({ open, onOpenChange }) {
         <DialogHeader>
           <DialogTitle>Open Shift</DialogTitle>
           <DialogDescription>
-            Count cash in the drawer. Drawer will pulse open on confirm. User:{" "}
-            <span className="text-amber-400 font-medium">{activeStaff?.name || "—"}</span>
+            Count cash in the drawer and identify who is opening. Drawer will pulse open on confirm.
           </DialogDescription>
         </DialogHeader>
+        <StaffPicker value={staffId} onChange={setStaffId} testid="open-staff" />
         <DenominationGrid value={denoms} onChange={setDenoms} testidPrefix="open-denom" />
         <Textarea
           data-testid="shift-open-note"
@@ -59,8 +69,8 @@ export default function ShiftOpenDialog({ open, onOpenChange }) {
           <Button
             data-testid="shift-open-confirm"
             onClick={submit}
-            disabled={busy || denomTotal(denoms) < 0}
-            className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
+            disabled={busy || !staffId || denomTotal(denoms) < 0}
+            className="bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-40"
           >
             {busy ? "Opening…" : "Confirm & Open Drawer"}
           </Button>

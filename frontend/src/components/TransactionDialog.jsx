@@ -10,6 +10,7 @@ import { useStore } from "@/hooks/useStore";
 import { api } from "@/lib/api";
 import { printer, buildReceiptLines } from "@/lib/printer";
 import { toast } from "sonner";
+import StaffPicker from "@/components/StaffPicker";
 
 const CATEGORIES = {
   IN: ["Cash Sale", "Deposit / Top-up", "Loan Repayment", "Other Income"],
@@ -18,26 +19,29 @@ const CATEGORIES = {
 };
 
 export default function TransactionDialog({ type, onClose, onReceipt }) {
-  const { activeStaff, refreshAll, shift, balance } = useStore();
+  const { staff, refreshAll, shift, balance } = useStore();
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
   const [printReceipt, setPrintReceipt] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [staffId, setStaffId] = useState("");
 
   useEffect(() => {
     if (type) {
       setAmount("");
       setNote("");
       setCategory(CATEGORIES[type]?.[0] || "");
+      setStaffId(""); // mandatory re-select each time
     }
   }, [type]);
 
   const open = !!type;
+  const activeStaff = staff.find((s) => s.id === staffId) || null;
 
   const submit = async () => {
     if (!activeStaff) {
-      toast.error("Select an active user first.");
+      toast.error("Select the user performing this transaction.");
       return;
     }
     if (!shift) {
@@ -98,12 +102,13 @@ export default function TransactionDialog({ type, onClose, onReceipt }) {
             Record {type === "IN" ? "Payment IN" : type === "OUT" ? "Payment OUT" : "Adjustment"}
           </DialogTitle>
           <DialogDescription>
-            User: <span className="text-amber-400 font-medium">{activeStaff?.name || "—"}</span>
-            {" · Drawer will pulse open on confirm."}
+            Confirm who is performing this action — the drawer will pulse open on confirm.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
+          <StaffPicker value={staffId} onChange={setStaffId} testid="txn-staff" />
+
           <div>
             <Label className="text-xs uppercase tracking-widest text-muted-foreground">Category</Label>
             <Select value={category} onValueChange={setCategory}>
@@ -156,8 +161,8 @@ export default function TransactionDialog({ type, onClose, onReceipt }) {
           <Button
             data-testid="txn-confirm"
             onClick={submit}
-            disabled={busy}
-            className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
+            disabled={busy || !staffId}
+            className="bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-40"
           >
             {busy ? "Recording…" : "Confirm"}
           </Button>

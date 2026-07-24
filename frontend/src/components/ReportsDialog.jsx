@@ -12,7 +12,9 @@ export default function ReportsDialog({ open, onOpenChange }) {
   const [shifts, setShifts] = useState([]);
   const [selectedShift, setSelectedShift] = useState("");
   const [z, setZ] = useState(null);
-  const [tab, setTab] = useState("x");
+  const [tab, setTab] = useState("daily");
+  const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
+  const [daily, setDaily] = useState(null);
 
   const loadX = async () => {
     try {
@@ -34,8 +36,25 @@ export default function ReportsDialog({ open, onOpenChange }) {
     if (open) {
       loadX();
       loadShifts();
+      loadDaily(day);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  const loadDaily = async (d) => {
+    try {
+      const data = await api.reports.daily(d);
+      setDaily(data);
+    } catch (e) {
+      setDaily(null);
+      toast.error("Failed to load daily report");
+    }
+  };
+
+  useEffect(() => {
+    if (open) loadDaily(day);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [day]);
 
   const loadZ = async (id) => {
     if (!id) return;
@@ -66,6 +85,51 @@ export default function ReportsDialog({ open, onOpenChange }) {
     a.download = `${report.report_type}-report-${report.shift.id.slice(0, 8)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportDailyCSV = () => {
+    if (!daily) return;
+    const rows = [["timestamp", "shift", "type", "category", "amount", "staff", "note", "receipt"]];
+    for (const t of daily.transactions) {
+      rows.push([t.created_at, t.shift_id.slice(0, 8), t.type, t.category, t.amount, t.staff_name, (t.note || "").replace(/[\n,]/g, " "), t.receipt_number]);
+    }
+    // Footer summary rows
+    rows.push([]);
+    rows.push(["", "", "", "TOTAL IN", daily.totals.IN]);
+    rows.push(["", "", "", "TOTAL OUT", daily.totals.OUT]);
+    rows.push(["", "", "", "TOTAL ADJ", daily.totals.ADJUSTMENT]);
+    rows.push(["", "", "", "NET", daily.totals.IN - daily.totals.OUT + daily.totals.ADJUSTMENT]);
+    const csv = rows.map((r) => r.map((c) => `"${String(c ?? "")}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `daily-report-${daily.date}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printDailyThermal = async () => {
+    if (!daily) return;
+    if (!printer.isConnected) {
+      toast.error("Printer not connected. Open Devices.");
+      return;
+    }
+    const net = daily.totals.IN - daily.totals.OUT + daily.totals.ADJUSTMENT;
+    const lines = [
+      `Report : DAILY`,
+      `Date   : ${daily.date}`,
+      `Shifts : ${daily.shift_count}`,
+      `Txns   : ${daily.transaction_count}`,
+      ``,
+      `IN     : INR ${daily.totals.IN.toFixed(2)}`,
+      `OUT    : INR ${daily.totals.OUT.toFixed(2)}`,
+      `ADJ    : INR ${daily.totals.ADJUSTMENT.toFixed(2)}`,
+      `-------`,
+      `NET    : INR ${net.toFixed(2)}`,
+    ];
+    await printer.printReceipt({ header: `DAILY REPORT`, lines, openDrawer: false });
+    toast.success("Daily report printed.");
   };
 
   const printPDF = () => {
@@ -110,10 +174,22 @@ export default function ReportsDialog({ open, onOpenChange }) {
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-2 bg-[#0f1725]">
+          <TabsList className="grid grid-cols-3 bg-[#0f1725]">
+            <TabsTrigger data-testid="tab-daily" value="daily">Daily</TabsTrigger>
             <TabsTrigger data-testid="tab-x" value="x">X-Report (Live)</TabsTrigger>
             <TabsTrigger data-testid="tab-z" value="z">Z-Report (Closed)</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="daily" className="mt-3">
+            <DailyReportView
+              daily={daily}
+              day={day}
+              onDayChange={setDay}
+              onCSV={exportDailyCSV}
+              onPDF={printPDF}
+              onThermal={printDailyThermal}
+            />
+          </TabsContent>
 
           <TabsContent value="x" className="mt-3">
             {x?.shift ? (
@@ -225,6 +301,163 @@ function Cell({ label, value, tone = "text-white" }) {
     <div className="rounded-md border border-border p-3 bg-[#0f1725]">
       <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground">{label}</div>
       <div className={`font-mono text-base mt-1 ${tone}`}>{value}</div>
+    </div>
+  );
+}
+
+
+function DailyReportView({ daily, day, onDayChange, onCSV, onPDF, onThermal }) {
+  const totals = daily?.totals || { IN: 0, OUT: 0, ADJUSTMENT: 0 };
+  const net = totals.IN - totals.OUT + totals.ADJUSTMENT;
+  const totalVariance = (daily?.shifts || []).reduce(
+    (a, s) => a + (typeof s.variance === "number" ? s.variance : 0),
+    0
+  );
+
+  return (
+    <div data-testid="daily-view" className="space-y-3">
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground">Date</span>
+        <input
+          data-testid="daily-date"
+          type="date"
+          value={day}
+          onChange={(e) => onDayChange(e.target.value)}
+          className="bg-[#0B1120] border border-border rounded-md text-sm px-3 py-1.5 font-mono"
+        />
+        <div className="ml-auto text-xs text-muted-foreground font-mono">
+          {daily ? `${daily.shift_count} shifts · ${daily.transaction_count} txns` : ""}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Cell label="Total IN" value={INR(totals.IN)} tone="text-emerald-400" />
+        <Cell label="Total OUT" value={INR(totals.OUT)} tone="text-rose-400" />
+        <Cell label="Adjustments" value={INR(totals.ADJUSTMENT)} tone="text-amber-400" />
+        <Cell label="Net Movement" value={INR(net)} tone={net === 0 ? "text-white" : net > 0 ? "text-emerald-400" : "text-rose-400"} />
+      </div>
+
+      {/* Shifts summary */}
+      <div className="border border-border rounded-md overflow-hidden">
+        <div className="px-3 py-2 bg-[#0f1725] text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground border-b border-border">
+          Shifts on {daily?.date || day}
+        </div>
+        <div className="max-h-40 overflow-y-auto thin-scroll">
+          <table className="w-full text-xs font-mono">
+            <thead className="text-[10px] uppercase tracking-widest text-muted-foreground bg-[#0f1725] sticky top-0">
+              <tr>
+                <th className="text-left px-3 py-2">Opened</th>
+                <th className="text-left px-3 py-2">By</th>
+                <th className="text-left px-3 py-2">Status</th>
+                <th className="text-right px-3 py-2">Opening</th>
+                <th className="text-right px-3 py-2">Closing</th>
+                <th className="text-right px-3 py-2">Variance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(daily?.shifts || []).map((s) => (
+                <tr key={s.id} data-testid={`daily-shift-${s.id}`} className="border-t border-border">
+                  <td className="px-3 py-1.5">
+                    {new Date(s.opened_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                  </td>
+                  <td className="px-3 py-1.5">{s.opened_by_name}</td>
+                  <td className="px-3 py-1.5">
+                    <span
+                      className={`px-1.5 py-0.5 rounded ${s.status === "OPEN" ? "bg-amber-500/15 text-amber-400" : "bg-slate-500/15 text-slate-400"}`}
+                    >
+                      {s.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-1.5 text-right">{INR(s.opening_amount)}</td>
+                  <td className="px-3 py-1.5 text-right">{s.closing_amount != null ? INR(s.closing_amount) : "—"}</td>
+                  <td
+                    className={`px-3 py-1.5 text-right ${s.variance == null ? "text-slate-400" : s.variance === 0 ? "text-emerald-400" : s.variance > 0 ? "text-amber-400" : "text-rose-400"}`}
+                  >
+                    {s.variance != null ? INR(s.variance) : "—"}
+                  </td>
+                </tr>
+              ))}
+              {(!daily || daily.shifts.length === 0) && (
+                <tr>
+                  <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
+                    No shifts on this date.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {daily && daily.shifts.some((s) => s.variance != null) && (
+          <div className="px-3 py-2 border-t border-border flex justify-end gap-6 text-xs font-mono bg-[#0f1725]">
+            <span className="text-muted-foreground uppercase tracking-widest text-[10px]">Total variance</span>
+            <span
+              className={
+                totalVariance === 0
+                  ? "text-emerald-400"
+                  : totalVariance > 0
+                    ? "text-amber-400"
+                    : "text-rose-400"
+              }
+            >
+              {INR(totalVariance)}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Transactions of the day */}
+      <div className="border border-border rounded-md max-h-56 overflow-y-auto thin-scroll">
+        <table className="w-full text-xs font-mono">
+          <thead className="text-[10px] uppercase tracking-widest text-muted-foreground bg-[#0f1725] sticky top-0">
+            <tr>
+              <th className="text-left px-3 py-2">Time</th>
+              <th className="text-left px-3 py-2">Type</th>
+              <th className="text-left px-3 py-2">Category</th>
+              <th className="text-left px-3 py-2">Staff</th>
+              <th className="text-right px-3 py-2">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(daily?.transactions || []).map((t) => (
+              <tr key={t.id} className="border-t border-border">
+                <td className="px-3 py-1.5">{new Date(t.created_at).toLocaleTimeString("en-IN")}</td>
+                <td className="px-3 py-1.5">{t.type}</td>
+                <td className="px-3 py-1.5">{t.category}</td>
+                <td className="px-3 py-1.5">{t.staff_name}</td>
+                <td
+                  className={`px-3 py-1.5 text-right ${t.type === "OUT" ? "text-rose-400" : t.type === "IN" ? "text-emerald-400" : "text-amber-400"}`}
+                >
+                  {INR(t.amount)}
+                </td>
+              </tr>
+            ))}
+            {(!daily || daily.transactions.length === 0) && (
+              <tr>
+                <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">
+                  No transactions.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button data-testid="daily-export-csv" onClick={onCSV} variant="outline" className="border-border" disabled={!daily}>
+          <Download className="h-4 w-4 mr-2" /> Export CSV
+        </Button>
+        <Button data-testid="daily-export-pdf" onClick={onPDF} variant="outline" className="border-border" disabled={!daily}>
+          <PrinterIcon className="h-4 w-4 mr-2" /> Print / Save PDF
+        </Button>
+        <Button
+          data-testid="daily-print-thermal"
+          onClick={onThermal}
+          disabled={!daily}
+          className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
+        >
+          <PrinterIcon className="h-4 w-4 mr-2" /> Thermal Print
+        </Button>
+      </div>
     </div>
   );
 }
