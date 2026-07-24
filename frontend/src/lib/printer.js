@@ -67,20 +67,70 @@ class SeltrackPrinter {
 
   async connectUSB() {
     if (!("usb" in navigator)) throw new Error("WebUSB API not supported in this browser.");
-    // Common thermal printer vendor IDs (Epson, Star, Bixolon, Citizen, generic 0x0416/0x0483/0x0525)
-    this.usbDevice = await navigator.usb.requestDevice({ filters: [{ classCode: 7 }, {}] });
-    await this.usbDevice.open();
-    if (this.usbDevice.configuration === null) await this.usbDevice.selectConfiguration(1);
-    // Pick first interface with OUT bulk endpoint
-    const iface = this.usbDevice.configuration.interfaces[0];
-    await this.usbDevice.claimInterface(iface.interfaceNumber);
-    const alt = iface.alternates[0];
-    const outEp = alt.endpoints.find((e) => e.direction === "out");
-    if (!outEp) throw new Error("No OUT endpoint on USB printer.");
-    this.usbEndpoint = outEp.endpointNumber;
-    this.mode = "usb";
-    await this._writeRaw(CMD.init);
-    return this.info;
+    // Ask the browser to show the device picker
+    try {
+      this.usbDevice = await navigator.usb.requestDevice({ filters: [{ classCode: 7 }, {}] });
+    } catch (e) {
+      if (e && e.name === "NotFoundError") throw new Error("No device selected.");
+      throw e;
+    }
+
+    // Try to open — this is where OS driver conflicts surface as "Access denied"
+    try {
+      await this.usbDevice.open();
+    } catch (e) {
+      const raw = (e && e.message) || String(e);
+      this.usbDevice = null;
+      if (/Access denied|already open|Unable to claim|Interface|unsupported/i.test(raw)) {
+        const plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+        let hint;
+        if (/win/i.test(plat)) {
+          hint = "On Windows the built-in printer driver locks the USB port. Fix: install a WinUSB driver on the printer using Zadig (https://zadig.akeo.ie) — OR simply pair via 'Web Serial' below (most receipt printers also expose a virtual COM port).";
+        } else if (/mac/i.test(plat)) {
+          hint = "On macOS the system's printer driver claims the port exclusively. Fix: remove the printer from System Settings → Printers & Scanners, unplug/replug — OR use 'Web Serial' below.";
+        } else {
+          hint = "On Linux the kernel driver 'usblp' claims the printer. Fix: `sudo modprobe -r usblp` (or add a udev rule granting your user access) — OR use 'Web Serial' below.";
+        }
+        throw new Error(`OS denied access to the USB device. ${hint}`);
+      }
+      throw new Error(raw || "Failed to open USB device.");
+    }
+
+    try {
+      if (this.usbDevice.configuration === null) await this.usbDevice.selectConfiguration(1);
+
+      // Find the first interface with a bulk OUT endpoint
+      let picked = null;
+      for (const iface of this.usbDevice.configuration.interfaces) {
+        for (const alt of iface.alternates) {
+          const out = alt.endpoints.find((ep) => ep.direction === "out" && ep.type === "bulk");
+          if (out) {
+            picked = { iface, alt, out };
+            break;
+          }
+        }
+        if (picked) break;
+      }
+      if (!picked) throw new Error("Printer has no bulk OUT endpoint (unsupported device).");
+
+      await this.usbDevice.claimInterface(picked.iface.interfaceNumber);
+      if (picked.alt.alternateSetting !== 0) {
+        await this.usbDevice.selectAlternateInterface(picked.iface.interfaceNumber, picked.alt.alternateSetting);
+      }
+      this.usbEndpoint = picked.out.endpointNumber;
+      this.mode = "usb";
+      await this._writeRaw(CMD.init);
+      return this.info;
+    } catch (e) {
+      // clean up on partial-open failure
+      try { await this.usbDevice.close(); } catch (_) { /* ignore */ }
+      this.usbDevice = null;
+      const raw = (e && e.message) || String(e);
+      if (/claim|busy|Unable/i.test(raw)) {
+        throw new Error(`Unable to claim the printer interface — the OS printer driver is holding it. Try 'Web Serial' instead, or remove the printer from your OS's printer settings and retry.`);
+      }
+      throw new Error(raw);
+    }
   }
 
   async disconnect() {

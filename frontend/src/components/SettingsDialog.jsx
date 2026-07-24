@@ -5,7 +5,7 @@ import { printer } from "@/lib/printer";
 import { useStore } from "@/hooks/useStore";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Usb, Cable, Zap, X, Eraser } from "lucide-react";
+import { Usb, Cable, Zap, X, Eraser, AlertTriangle } from "lucide-react";
 
 export default function SettingsDialog({ open, onOpenChange }) {
   const { drawerConnected, drawerInfo, setDrawerState, refreshAll } = useStore();
@@ -122,6 +122,7 @@ export default function SettingsDialog({ open, onOpenChange }) {
             >
               <Cable className="h-4 w-4" />
               <span className="text-xs font-bold uppercase tracking-wider">Web Serial</span>
+              <span className="text-[9px] font-normal text-emerald-400/80">Recommended</span>
             </Button>
             <Button
               data-testid="connect-usb"
@@ -131,8 +132,56 @@ export default function SettingsDialog({ open, onOpenChange }) {
             >
               <Usb className="h-4 w-4" />
               <span className="text-xs font-bold uppercase tracking-wider">WebUSB</span>
+              <span className="text-[9px] font-normal text-muted-foreground">Advanced</span>
             </Button>
           </div>
+
+          <details data-testid="usb-troubleshoot" className="rounded-md border border-amber-500/30 bg-amber-500/5 text-xs">
+            <summary className="cursor-pointer px-3 py-2 flex items-center gap-2 text-amber-400 font-medium">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Getting <span className="font-mono">&quot;Access denied&quot;</span> on WebUSB?
+            </summary>
+            <div className="px-3 pb-3 pt-1 space-y-2 text-muted-foreground leading-relaxed">
+              <p>
+                <b className="text-foreground">Cause:</b> your OS&apos;s built-in printer driver has claimed the USB port
+                exclusively — <span className="font-mono">USBDevice.open()</span> then fails with{" "}
+                <span className="font-mono">Access denied</span>. This is not a SELTRACK bug.
+              </p>
+              <p className="text-foreground"><b>Easiest fix — use Web Serial instead:</b></p>
+              <p>
+                Most receipt printers (Epson TM-T, Star TSP, Xprinter, generic 58mm/80mm) also expose a virtual COM
+                port. Click <b>Web Serial</b> above → pick the printer&apos;s COM/tty entry. This bypasses the OS driver
+                lock entirely.
+              </p>
+              <p className="text-foreground"><b>Or force WebUSB by replacing the driver:</b></p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>
+                  <b>Windows</b>: install a <b>WinUSB</b> driver on the printer using{" "}
+                  <a
+                    href="https://zadig.akeo.ie"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-amber-400 underline"
+                  >
+                    Zadig
+                  </a>
+                  , then reconnect.
+                </li>
+                <li>
+                  <b>macOS</b>: remove the printer under <i>System Settings → Printers &amp; Scanners</i>, unplug/replug,
+                  then try again.
+                </li>
+                <li>
+                  <b>Linux</b>: unload the kernel printer driver — <span className="font-mono">sudo modprobe -r usblp</span>{" "}
+                  — or add a udev rule for your printer&apos;s vendor ID.
+                </li>
+              </ul>
+              <p className="pt-1">
+                <b className="text-foreground">Note:</b> Web Serial &amp; WebUSB only work in <b>Chrome</b> or <b>Edge</b>{" "}
+                over HTTPS.
+              </p>
+            </div>
+          </details>
 
           <Button
             data-testid="test-drawer"
