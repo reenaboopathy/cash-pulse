@@ -670,6 +670,103 @@ async def daily_report(day: Optional[str] = None):
         "transactions": txns,
     }
 
+@api_router.get("/reports/staff")
+async def staff_report(day: Optional[str] = None):
+    """Per-staff activity for a day: opened/closed shifts, txn counts, totals by type & method."""
+    target = day or datetime.now(timezone.utc).date().isoformat()
+    start = f"{target}T00:00:00+00:00"
+    end = f"{target}T23:59:59+00:00"
+    shifts = await db.shifts.find({"opened_at": {"$gte": start, "$lte": end}}, {"_id": 0}).sort("opened_at", 1).to_list(500)
+    shift_ids = [s["id"] for s in shifts]
+    txns = await db.transactions.find({"shift_id": {"$in": shift_ids}}, {"_id": 0}).sort("created_at", 1).to_list(10000)
+
+    per_staff: Dict[str, dict] = {}
+
+    def entry(sid: str, sname: str) -> dict:
+        if sid not in per_staff:
+            per_staff[sid] = {
+                "staff_id": sid,
+                "staff_name": sname,
+                "shifts_opened": 0,
+                "shifts_closed": 0,
+                "transaction_count": 0,
+                "totals": {"IN": 0.0, "OUT": 0.0, "ADJUSTMENT": 0.0},
+                "by_method": {
+                    "CASH": {"IN": 0.0, "OUT": 0.0, "ADJUSTMENT": 0.0},
+                    "UPI": {"IN": 0.0, "OUT": 0.0, "ADJUSTMENT": 0.0},
+                    "BANK": {"IN": 0.0, "OUT": 0.0, "ADJUSTMENT": 0.0},
+                },
+                "transactions": [],
+            }
+        return per_staff[sid]
+
+    for s in shifts:
+        opener = entry(s["opened_by_id"], s["opened_by_name"])
+        opener["shifts_opened"] += 1
+        if s.get("status") == "CLOSED" and s.get("closed_by_id"):
+            closer = entry(s["closed_by_id"], s.get("closed_by_name") or "-")
+            closer["shifts_closed"] += 1
+    for t in txns:
+        e = entry(t["staff_id"], t["staff_name"])
+        e["transaction_count"] += 1
+        e["totals"][t["type"]] += t["amount"]
+        m = t.get("payment_method") or "CASH"
+        if m in e["by_method"]:
+            e["by_method"][m][t["type"]] += t["amount"]
+        e["transactions"].append(t)
+
+    staff_rows = sorted(per_staff.values(), key=lambda x: x["staff_name"])
+    return {
+        "date": target,
+        "staff": staff_rows,
+        "staff_count": len(staff_rows),
+        "transaction_count": len(txns),
+        "shift_count": len(shifts),
+    }
+
+@api_router.get("/reports/expenses")
+async def expenses_report(day: Optional[str] = None):
+    """Detailed expense report — all type=OUT transactions for a day, grouped by category + payment method."""
+    target = day or datetime.now(timezone.utc).date().isoformat()
+    start = f"{target}T00:00:00+00:00"
+    end = f"{target}T23:59:59+00:00"
+    shifts = await db.shifts.find({"opened_at": {"$gte": start, "$lte": end}}, {"_id": 0}).to_list(500)
+    shift_ids = [s["id"] for s in shifts]
+    txns = await db.transactions.find(
+        {"shift_id": {"$in": shift_ids}, "type": "OUT"}, {"_id": 0}
+    ).sort("created_at", 1).to_list(10000)
+
+    by_category: Dict[str, float] = {}
+    by_method: Dict[str, float] = {"CASH": 0.0, "UPI": 0.0, "BANK": 0.0}
+    by_staff: Dict[str, dict] = {}
+    total = 0.0
+    for t in txns:
+        by_category[t["category"]] = by_category.get(t["category"], 0.0) + t["amount"]
+        m = t.get("payment_method") or "CASH"
+        if m in by_method:
+            by_method[m] += t["amount"]
+        sid = t["staff_id"]
+        if sid not in by_staff:
+            by_staff[sid] = {"staff_id": sid, "staff_name": t["staff_name"], "amount": 0.0, "count": 0}
+        by_staff[sid]["amount"] += t["amount"]
+        by_staff[sid]["count"] += 1
+        total += t["amount"]
+
+    categories = sorted(
+        [{"category": k, "amount": v} for k, v in by_category.items()],
+        key=lambda x: -x["amount"],
+    )
+    staff_rows = sorted(by_staff.values(), key=lambda x: -x["amount"])
+    return {
+        "date": target,
+        "transaction_count": len(txns),
+        "total": total,
+        "by_category": categories,
+        "by_method": by_method,
+        "by_staff": staff_rows,
+        "transactions": txns,
+    }
+
 # ---- Admin Dashboard aggregate ----
 @api_router.get("/admin/dashboard")
 async def admin_dashboard(admin: dict = Depends(get_current_admin)):

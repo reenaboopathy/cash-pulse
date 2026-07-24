@@ -77,6 +77,8 @@ export const api = {
     x: (shiftId) => http.get(`/reports/x${shiftId ? `?shift_id=${shiftId}` : ""}`).then((r) => r.data),
     z: (shiftId) => http.get(`/reports/z?shift_id=${shiftId}`).then((r) => r.data),
     daily: (day) => http.get(`/reports/daily${day ? `?day=${day}` : ""}`).then((r) => r.data),
+    staff: (day) => http.get(`/reports/staff${day ? `?day=${day}` : ""}`).then((r) => r.data),
+    expenses: (day) => http.get(`/reports/expenses${day ? `?day=${day}` : ""}`).then((r) => r.data),
   },
   admin: {
     dashboard: () => http.get("/admin/dashboard").then((r) => r.data),
