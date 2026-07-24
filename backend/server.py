@@ -740,11 +740,22 @@ async def on_startup():
     await seed_staff()
     await seed_reasons()
     await seed_admin()
-    # Idempotency index on transactions.client_id (sparse — legacy rows without client_id are OK)
+    # Idempotency: enforce unique client_id only on rows where client_id is a string.
+    # sparse=True does NOT skip explicit null values, so use partialFilterExpression instead.
     try:
-        await db.transactions.create_index("client_id", unique=True, sparse=True)
+        # Drop legacy sparse index if it exists (safe if it doesn't)
+        try:
+            await db.transactions.drop_index("client_id_1")
+        except Exception:
+            pass
+        await db.transactions.create_index(
+            "client_id",
+            unique=True,
+            partialFilterExpression={"client_id": {"$type": "string"}},
+            name="client_id_unique_partial",
+        )
     except Exception as e:
-        logger.warning(f"transactions.client_id index: {e}")
+        logger.warning(f"transactions.client_id partial index: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
