@@ -113,16 +113,25 @@ export default function ReportsDialog({ open, onOpenChange }) {
 
   const exportDailyCSV = () => {
     if (!daily) return;
-    const rows = [["timestamp", "shift", "type", "category", "amount", "staff", "note", "receipt"]];
+    const rows = [["timestamp", "shift", "type", "method", "category", "amount", "staff", "note", "receipt"]];
     for (const t of daily.transactions) {
-      rows.push([t.created_at, t.shift_id.slice(0, 8), t.type, t.category, t.amount, t.staff_name, (t.note || "").replace(/[\n,]/g, " "), t.receipt_number]);
+      rows.push([t.created_at, t.shift_id.slice(0, 8), t.type, t.payment_method || "CASH", t.category, t.amount, t.staff_name, (t.note || "").replace(/[\n,]/g, " "), t.receipt_number]);
     }
-    // Footer summary rows
+    // Footer with method-split totals
+    const m = daily.totals_by_method || {};
+    const cashIn = m.CASH?.IN || 0;
+    const cashOut = m.CASH?.OUT || 0;
+    const upiIn = (m.UPI?.IN || 0) + (m.BANK?.IN || 0);
+    const upiOut = (m.UPI?.OUT || 0) + (m.BANK?.OUT || 0);
     rows.push([]);
-    rows.push(["", "", "", "TOTAL IN", daily.totals.IN]);
-    rows.push(["", "", "", "TOTAL OUT", daily.totals.OUT]);
-    rows.push(["", "", "", "TOTAL ADJ", daily.totals.ADJUSTMENT]);
-    rows.push(["", "", "", "NET", daily.totals.IN - daily.totals.OUT + daily.totals.ADJUSTMENT]);
+    rows.push(["", "", "", "", "CASH IN", cashIn]);
+    rows.push(["", "", "", "", "UPI/BANK IN", upiIn]);
+    rows.push(["", "", "", "", "TOTAL IN", daily.totals.IN]);
+    rows.push(["", "", "", "", "CASH OUT", cashOut]);
+    rows.push(["", "", "", "", "UPI/BANK OUT", upiOut]);
+    rows.push(["", "", "", "", "TOTAL OUT", daily.totals.OUT]);
+    rows.push(["", "", "", "", "TOTAL ADJ", daily.totals.ADJUSTMENT]);
+    rows.push(["", "", "", "", "NET", daily.totals.IN - daily.totals.OUT + daily.totals.ADJUSTMENT]);
     const csv = rows.map((r) => r.map((c) => `"${String(c ?? "")}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -339,9 +348,25 @@ function Cell({ label, value, tone = "text-white" }) {
   );
 }
 
+function SplitCell({ testid, label, value, tone = "text-white" }) {
+  return (
+    <div data-testid={testid} className="rounded border border-border bg-[#0B1120] p-2">
+      <div className="text-[9px] uppercase tracking-widest text-muted-foreground">{label}</div>
+      <div className={`font-mono text-sm mt-0.5 ${tone}`}>{INR(value)}</div>
+    </div>
+  );
+}
+
 
 function DailyReportView({ daily, day, onDayChange, onCSV, onPDF, onThermal }) {
   const totals = daily?.totals || { IN: 0, OUT: 0, ADJUSTMENT: 0 };
+  const methods = daily?.totals_by_method || {
+    CASH: { IN: 0, OUT: 0, ADJUSTMENT: 0 },
+    UPI: { IN: 0, OUT: 0, ADJUSTMENT: 0 },
+    BANK: { IN: 0, OUT: 0, ADJUSTMENT: 0 },
+  };
+  const upiBankIn = (methods.UPI?.IN || 0) + (methods.BANK?.IN || 0);
+  const upiBankOut = (methods.UPI?.OUT || 0) + (methods.BANK?.OUT || 0);
   const net = totals.IN - totals.OUT + totals.ADJUSTMENT;
   const totalVariance = (daily?.shifts || []).reduce(
     (a, s) => a + (typeof s.variance === "number" ? s.variance : 0),
@@ -364,9 +389,34 @@ function DailyReportView({ daily, day, onDayChange, onCSV, onPDF, onThermal }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Cell label="Total IN" value={INR(totals.IN)} tone="text-emerald-400" />
-        <Cell label="Total OUT" value={INR(totals.OUT)} tone="text-rose-400" />
+      {/* Cash IN / OUT split by method */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
+          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">Money IN</div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <SplitCell testid="daily-cash-in" label="Cash" value={methods.CASH?.IN || 0} tone="text-emerald-400" />
+            <SplitCell testid="daily-upi-in" label="UPI / Bank" value={upiBankIn} tone="text-emerald-400" />
+          </div>
+          <div className="mt-2 pt-2 border-t border-emerald-500/20 flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Total IN</span>
+            <span data-testid="daily-total-in" className="font-mono text-lg text-emerald-400">{INR(totals.IN)}</span>
+          </div>
+        </div>
+
+        <div className="rounded-md border border-rose-500/30 bg-rose-500/5 p-3">
+          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-rose-300">Money OUT</div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <SplitCell testid="daily-cash-out" label="Cash" value={methods.CASH?.OUT || 0} tone="text-rose-400" />
+            <SplitCell testid="daily-upi-out" label="UPI / Bank" value={upiBankOut} tone="text-rose-400" />
+          </div>
+          <div className="mt-2 pt-2 border-t border-rose-500/20 flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Total OUT</span>
+            <span data-testid="daily-total-out" className="font-mono text-lg text-rose-400">{INR(totals.OUT)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
         <Cell label="Adjustments" value={INR(totals.ADJUSTMENT)} tone="text-amber-400" />
         <Cell label="Net Movement" value={INR(net)} tone={net === 0 ? "text-white" : net > 0 ? "text-emerald-400" : "text-rose-400"} />
       </div>
@@ -446,6 +496,7 @@ function DailyReportView({ daily, day, onDayChange, onCSV, onPDF, onThermal }) {
             <tr>
               <th className="text-left px-3 py-2">Time</th>
               <th className="text-left px-3 py-2">Type</th>
+              <th className="text-left px-3 py-2">Method</th>
               <th className="text-left px-3 py-2">Category</th>
               <th className="text-left px-3 py-2">Staff</th>
               <th className="text-right px-3 py-2">Amount</th>
@@ -456,6 +507,9 @@ function DailyReportView({ daily, day, onDayChange, onCSV, onPDF, onThermal }) {
               <tr key={t.id} className="border-t border-border">
                 <td className="px-3 py-1.5">{new Date(t.created_at).toLocaleTimeString("en-IN")}</td>
                 <td className="px-3 py-1.5">{t.type}</td>
+                <td className={`px-3 py-1.5 ${t.payment_method === "CASH" ? "text-amber-400" : "text-emerald-400"}`}>
+                  {t.payment_method === "CASH" ? "CASH" : "UPI/BANK"}
+                </td>
                 <td className="px-3 py-1.5">{t.category}</td>
                 <td className="px-3 py-1.5">{t.staff_name}</td>
                 <td
@@ -467,7 +521,7 @@ function DailyReportView({ daily, day, onDayChange, onCSV, onPDF, onThermal }) {
             ))}
             {(!daily || daily.transactions.length === 0) && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">
+                <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
                   No transactions.
                 </td>
               </tr>
