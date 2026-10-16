@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 6 backend revalidation of partial-index fix for transactions.client_id. Re-ran /app/backend/tests/test_iteration5_fixes.py (all 13 tests PASS including previously failing test_5_omit_client_id_creates_new_each_time). Added /app/backend/tests/test_iteration6_index_and_mix.py to verify DB-level index shape, explicit repro (two POSTs with no client_id → distinct txn ids AND distinct receipt_numbers), mixing (with client_id then without → distinct), and idempotency regressions (same cid → same txn; different cids → distinct). All 5 new tests PASS. Direct pymongo inspection confirms the transactions collection has 'client_id_unique_partial' (unique=true, partialFilterExpression={'client_id': {'$type': 'string'}}) and NO 'client_id_1' sparse index. Fix confirmed working.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration5_fixes.py",
+    "/app/backend/tests/test_iteration6_index_and_mix.py",
+    "/app/test_reports/pytest/iteration6_results.xml",
+    "/app/test_reports/pytest/iteration6_index_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Partial index migration is idempotent (drops legacy sparse index if present, then creates the new partial one). Good.",
+    "Consider adding a lightweight startup log line confirming which of the two branches ran (drop-legacy vs already-migrated) for operational visibility."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration6_index_and_mix.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "skipped-per-request"},
+  "test_credentials": "Admin mobile 9999999999 / password admin123 (from review_request; matches /app/memory/test_credentials.md convention)",
+  "seed_data_creation": "Ephemeral test bank named TEST_Idem_* created inside idempotency tests. Test transactions posted to a fresh shift, then shift closed for cleanup.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 5 index bug (sparse blocking legacy null path) is fully resolved via partial index. Both suites (test_iteration5_fixes.py, test_iteration6_index_and_mix.py) are green as of iter 6. Frontend was already 100% in iter 5 and was intentionally skipped this iteration.",
+  "rca of the issue": "Original bug: MongoDB sparse-unique index only excludes documents where the indexed field is ABSENT, but Pydantic serialises Optional[str]=None to JSON null which Mongo stores as a present-but-null value → the second insert with client_id=null hit a duplicate-key error on the legacy sparse index. Fix (verified): replace with a partial index whose filter is {client_id: {$type: 'string'}} so null/absent both bypass the unique constraint, while string values remain uniquely enforced. Verified idempotency retained for real client_ids, and null-path now creates distinct txns."
+}

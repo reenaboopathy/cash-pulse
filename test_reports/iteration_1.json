@@ -1,0 +1,44 @@
+{
+  "summary": "SELTRACK backend API tested end-to-end via pytest against the public preview URL. 25/25 tests passed (100%). Covered: root, staff seeding + create, meta denominations, full shift lifecycle (open/close/current), transactions (IN/OUT/ADJUSTMENT + validation), X-report, Z-report (open-shift rejection + closed-shift success), shifts list ordering, get-by-id, daily report, receipt-number monotonicity, and ISO datetime format. All business rules verified — 1760 opening amount from denomination math, running balance = 2010, variance=0 close, negative amount allowed only for ADJUSTMENT, second open blocked with 400, txn without open shift blocked with 400.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/staff", "issue": "Returns HTTP 200 instead of 201 on create (FastAPI default). Not a bug per spec but conventionally 201 Created is preferred."},
+      {"endpoint": "GET /api/reports/daily", "issue": "Uses lexicographic string comparison on ISO timestamps with '+00:00' suffix; works today for UTC dates but if any shift ever stores a non-UTC offset the date-range filter will silently miss/include rows. Consider storing raw datetime with an index, or normalizing to UTC before comparing."},
+      {"endpoint": "POST /api/shifts/close", "issue": "No validation that closing staff_id exists in staff before running compute_expected? Actually it does check 404. OK. However closing note logic uses payload.note or shift.get('note') via shift dict lookup — works but subtle."},
+      {"endpoint": "app.on_event('startup'/'shutdown')", "issue": "FastAPI on_event is deprecated in favor of lifespan handlers (works but deprecation warning in newer versions)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_seltrack_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "None — all 25 backend tests pass. Minor code-quality suggestions above are non-blocking."
+  ],
+  "critical_code_review_comments": [
+    "server.py is a single 373-line file — still under the 700-line threshold, but as more features arrive (CSV/PDF export, drawer log, printer session), split into routers/ (staff.py, shifts.py, transactions.py, reports.py) and services/ (compute_expected, receipt counter).",
+    "compute_expected() and the identical aggregation block inside current_shift() duplicate the totals aggregation — extract a single helper get_shift_totals(shift_id) returning (totals, expected).",
+    "X-report and Z-report have near-identical body construction — extract a build_report(shift, txns, report_type) helper (DRY).",
+    "Transactions endpoint stores signed amount as-is (positive for IN/OUT/ADJUSTMENT, negative allowed only for ADJUSTMENT). compute_expected then does opening + IN - OUT + ADJUSTMENT. This is correct, but the sign convention is subtle and undocumented; add a short docstring.",
+    "next_receipt_number() is a global counter across all shifts. If daily/shift-scoped receipt numbering is desired for physical receipts, revisit — otherwise fine.",
+    "No index on shifts.status or transactions.shift_id — will slow down as data grows. Add MongoDB indexes on startup.",
+    "CORS uses '*' by default which is fine for preview; restrict in production.",
+    "No pagination metadata on GET /api/shifts or GET /api/transactions (only a raw limit) — consider returning total count for UI paging."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_seltrack_backend.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "N/A (skipped per request)"},
+  "test_credentials": "None required — no auth on any endpoint.",
+  "seed_data_creation": "Server auto-seeds 4 default staff (Rahul Sharma, Priya Patel, Amit Kumar, Sneha Iyer) on first /api/staff hit. Tests additionally created one TEST_Extra Cashier staff record and two shifts (one closed by test flow, one closed by receipt-monotonic sub-test). Preview DB now contains these leftover shifts/txns — safe to leave.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run tests serially with `pytest backend/tests/test_seltrack_backend.py -n 0`. The shared preview DB has state from this run (closed shifts + TEST_Extra Cashier staff). The `_fresh_state` session-scoped fixture closes any lingering open shift at start/end. If pytest-xdist parallelism (>1 worker) is left enabled, TestShiftFlow will race — hence the -n 0 requirement. Frontend was intentionally skipped (backend-only request).",
+  "rca of the issue": "N/A — no functional issues. During the first parallel run, 3 tests appeared to fail (X-report 404, Z-report 200 instead of 400, close 'no open shift'). Root cause: pytest-xdist workers each run the session-scoped `_fresh_state` autouse fixture, and the second worker's teardown ran `_close_any_open_shift` while the first worker was mid-flow. Rerunning with `-n 0` (serial) resulted in 25/25 pass."
+}

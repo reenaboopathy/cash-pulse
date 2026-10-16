@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 8 — verified two new report endpoints (/api/reports/staff, /api/reports/expenses) and their ReportsDialog tabs. Backend: 10/10 pytest cases PASS in /app/backend/tests/test_iteration8_reports_staff_expenses.py — empty-shape validation (no query + far-past date), populated flow (opened shift with staff A, recorded CASH IN 100 + UPI IN 200 against existing bank + CASH OUT 50), staff report row asserts (shifts_opened>=1, transaction_count>=2, totals.IN>=300, totals.OUT>=50, by_method.CASH.IN>=100, by_method.CASH.OUT>=50, by_method.UPI.IN>=200), expenses report asserts (transaction_count>=1, total>=50, by_category TEST_Expense>=50, by_method.CASH>=50, by_staff amount>=50 & count>=1), regression on /api/reports/daily shape (totals + totals_by_method + shifts + transactions), regression on admin-guarded endpoints (GET /api/admin/dashboard 401 without token, POST /api/staff 401 without token). Frontend: opened ReportsDialog from cash-register reports-btn, confirmed 5 tabs (tab-daily, tab-staff, tab-expenses, tab-x, tab-z), staff-view + staff-date + expenses-view + expenses-date + expenses-total + expenses-export-csv + expenses-export-pdf all render; changing the date input in both Staff and Expenses tabs fires the correct GET /api/reports/staff?day= and /api/reports/expenses?day= calls (captured via page.on('request')). Daily and Z-Report tabs still render — no regression.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ReportsDialog header", "issues": ["DialogDescription still reads 'X-Report (current shift snapshot) & Z-Report (closed shift final).' but the dialog now hosts 5 tabs including Daily, Staff and Expenses. Consider updating the description to reflect all report types."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration8_reports_staff_expenses.py",
+    "/app/test_reports/pytest/iteration8_results.xml"
+  ],
+  "action_items": [
+    "Optional: update ReportsDialog DialogDescription text to mention Daily/Staff/Expenses (currently only mentions X and Z reports)."
+  ],
+  "critical_code_review_comments": [
+    "Both /reports/staff and /reports/expenses use naive ISO string range on opened_at ('YYYY-MM-DDT00:00:00+00:00'..'23:59:59+00:00'). This works because all timestamps use datetime.now(timezone.utc).isoformat() which yields '+00:00' suffix, but is brittle if timezone handling ever changes. Consider storing datetime objects and querying with datetime bounds.",
+    "expenses_report scope is transactions attached to shifts OPENED that day. If a shift opens at 23:55 and OUT is recorded at 00:10 the next day, that OUT still lands in the day-of-opening report and NOT in the next-day report (because both endpoints filter by shifts.opened_at, not transaction.created_at). Confirm this matches product intent — otherwise switch to filtering transactions by created_at.",
+    "Both new endpoints are UNAUTHENTICATED — same as /reports/daily/x/z, which is consistent with the current design but every staff txn/name is publicly readable. If required, gate with get_current_admin.",
+    "ReportsDialog: the two useEffects on lines 37 and 56 both fire loadDaily(day) when open changes — small double-fetch on dialog open. Minor.",
+    "One React hydration warning observed in the Z-report tab: <span> rendered inside <option> (from dev instrumentation attributes on the option's text child). Not caused by app source — it's the x-component instrumentation wrapping the string. Benign, but worth pinning if you run with strict-mode SSR."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration8_reports_staff_expenses.py (new)"
+  ],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% (all iter-8 checks)"},
+  "test_credentials": "Admin mobile 9999999999 / password admin123 / PIN 123456 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Opened a shift with existing staff (Amit Kumar), then recorded 3 test transactions (CASH IN 100 TEST_CashSale, UPI IN 200 TEST_UPISale against first available bank, CASH OUT 50 TEST_Expense). Client_ids all prefixed with TEST_it8_. Shift closed in teardown.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter-8 reporting additions fully verified — backend endpoints return the documented shape and correct aggregations, ReportsDialog exposes both new tabs with correct data-testids (staff-view, expenses-view, staff-date, expenses-date, expenses-total, staff/expenses export buttons) and the network calls fire on date change. Only nits: DialogDescription still says X/Z only; consider filter-by-created_at semantics for expenses/staff around midnight; both endpoints are public (parity with daily/x/z).",
+  "rca of the issue": "N/A — no bugs found this iteration."
+}

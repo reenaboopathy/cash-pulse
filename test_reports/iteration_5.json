@@ -1,0 +1,45 @@
+{
+  "summary": "SELTRACK Iteration 5 — Post-code-review surgical fixes verified. Backend: 12/13 pytest cases PASS. ONE CRITICAL BUG FOUND — the sparse unique index on transactions.client_id blocks the legacy path (no client_id): Python inserts client_id: null (field present with null value), and a MongoDB sparse index only skips DOCUMENTS MISSING THE FIELD, not documents with null. Second consecutive POST without client_id raises 500 DuplicateKeyError on {client_id: null}. Frontend: all 4 fixes verified PASS — 401 auto-logout redirect to /login from /admin works, token cleared, [data-testid='test-drawer'] absent from DOM, no 'Test Drawer' text button, UPI dialog opens with expected data-testids present. Zero console errors during login/refresh flow.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/transactions (no client_id in body)",
+        "issue": "Second call (and every subsequent call) without client_id returns 500 DuplicateKeyError. Root cause: startup creates `db.transactions.create_index('client_id', unique=True, sparse=True)`, but the Transaction Pydantic model always emits `client_id` in `model_dump()` (as None when not provided). MongoDB sparse indexes skip only DOCUMENTS MISSING the field, not documents where the field is null. Two null client_id values violate uniqueness. Backend log: `pymongo.errors.DuplicateKeyError: E11000 duplicate key error collection: test_database.transactions index: client_id_1 dup key: { client_id: null }`.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration5_fixes.py",
+    "/app/test_reports/pytest/iteration5_results.xml"
+  ],
+  "action_items": [
+    "FIX CRITICAL: server.py — replace the sparse unique index with a PARTIAL unique index that filters on non-null strings. Example: `await db.transactions.create_index('client_id', unique=True, partialFilterExpression={'client_id': {'$type': 'string'}})`. OR: in create_transaction, when payload.client_id is None, insert txn with client_id field DROPPED (e.g., `doc = txn.model_dump(); if doc.get('client_id') is None: doc.pop('client_id', None); await db.transactions.insert_one(doc)`). Either fix restores the legacy POST /api/transactions path (no client_id) which is currently broken after the first null-client_id row is written.",
+    "After fix, drop the existing bad index and recreate: `db.transactions.dropIndex('client_id_1')` then let startup recreate the partial one."
+  ],
+  "critical_code_review_comments": [
+    "server.py line 745 uses `sparse=True` which is a well-known MongoDB gotcha: sparse only excludes documents whose key is ABSENT, not documents where the key exists but is null. Because Pydantic emits Optional fields as `None` (JSON null), the sparse guard fails on the second no-client_id insert. Use `partialFilterExpression={'client_id': {'$type': 'string'}}` or exclude None-valued fields at insert time.",
+    "The rollback branch on adjust_bank_balance failure is good, but note: the DuplicateKeyError above happens BEFORE the bank branch (during `db.transactions.insert_one`), so the rollback is not triggered. Behavior is 500 to caller, no txn persisted — technically consistent, but breaks the legacy path entirely.",
+    "server.py is 752 lines — the earlier suggestion (split into routers/) still stands as the file continues to grow with each patch.",
+    "Frontend api.js interceptor correctly only bounces to /login when pathname starts with /admin (verified). Note: it doesn't handle 401 on /login itself (fine — no false-negatives), but also doesn't set any redirect flag / return-to path — user has to re-navigate manually after re-login. Optional enhancement, not a bug."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration5_fixes.py (NEW — 13 pytest cases covering fix #1 no-leak, fix #3 idempotency, fix #2 401 sanity)"
+  ],
+  "success_rate": {
+    "backend": "92% (12/13) — 1 critical fail on legacy no-client_id path",
+    "frontend": "100% (all fixes verified: 401 redirect, token clear, Test Drawer removed, dialog opens, 0 console errors)"
+  },
+  "test_credentials": "Mobile 9999999999 / password admin123 / PIN 123456 — verified working.",
+  "seed_data_creation": "Created ephemeral TEST_Idem_<random> banks and opened+closed a shift during pytest run. Final state left clean (no open shift, cleanup executed).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "New test file /app/backend/tests/test_iteration5_fixes.py has 13 tests. 12 pass; test_5_omit_client_id_creates_new_each_time will keep failing until main agent replaces the sparse unique index with a partial index (or strips client_id=None before insert). Frontend fixes all verified working — no retest needed for frontend after backend fix. Run: `REACT_APP_BACKEND_URL=<url> pytest backend/tests/test_iteration5_fixes.py -v -n 0`.",
+  "rca_of_the_issue": "RCA — Sparse unique index does NOT block writes when the field is present-but-null. Pydantic `Optional[str] = None` fields are serialized to `null` by `model_dump()`, so every legacy txn (no client_id) is inserted with `client_id: null`. The first such insert succeeds; the second collides because `{client_id: null}` matches an existing indexed key. Reproduction: (a) close any open shift; (b) open a fresh shift; (c) POST /api/transactions twice with body `{type:IN, category:'Cash Sale', amount:12, staff_id:<id>, payment_method:'CASH'}` (no client_id). Second call → 500. Mitigation: use `partialFilterExpression={'client_id': {'$type': 'string'}}` for the unique index OR omit the field on insert when None (`doc.pop('client_id', None)`)."
+}

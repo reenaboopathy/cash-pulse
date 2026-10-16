@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 7 end-to-end verification of (A) shift open/close working without a connected drawer and (B) top-nav ↔ admin-console reorg + staff-mutation admin gate. Backend: 16/16 tests PASS in /app/backend/tests/test_iteration7_admin_guard_and_shift.py — POST/PATCH/DELETE /api/staff now return 401 without a Bearer token and succeed with the admin token; GET /api/staff, /api/banks, /api/reasons stay PUBLIC; POST /api/banks + DELETE /api/reasons still require admin; a shift opens with the backend having zero knowledge of the drawer, a UPI transaction posts and the target bank_balance increases by the amount, missing bank_id → 400, shift close computes CASH-only expected balance correctly; same client_id repeat returns the same txn (idempotency regression intact). Frontend: cash-register top nav contains reports-btn + settings-btn + admin-nav-btn ONLY (banks-btn and staff-btn removed); disconnected banner now advertises that UPI/Bank + shift open/close still work; open-shift-btn is ENABLED when drawer is offline, opens the dialog, and successfully opens the shift; after open, action-in/out/adj remain disabled while action-upi is ENABLED and opens txn-dialog with UPI preselected; close-shift-btn label becomes 'Close Shift' (drawer offline) and close succeeds. Admin console header contains admin-banks-btn + admin-users-btn + admin-reports-btn + admin-creds-btn + admin-clear-btn + admin-logout; Users opens staff-dialog, Banks opens banks-dialog. No non-benign console errors during navigation between /, /login, /admin.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ShiftOpenDialog (drawer offline)", "issues": ["Dialog description still reads 'Drawer will pulse open on confirm' and the confirm button label is still 'Confirm & Open Drawer' even when the drawer is offline. Behaviour is correct (no pulse attempted), but the copy is misleading. Consider switching the description/button label based on printer.isConnected — same treatment already applied in ShiftControl."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration7_admin_guard_and_shift.py",
+    "/app/test_reports/pytest/iteration7_results.xml"
+  ],
+  "action_items": [
+    "Optional UX polish: swap ShiftOpenDialog description/button label to a non-pulse variant when printer.isConnected is false (mirrors the label toggle already in ShiftControl and ShiftCloseDialog)."
+  ],
+  "critical_code_review_comments": [
+    "Auth: get_current_admin correctly returns 401 (not 403) for missing/invalid/expired tokens — good and consistent with iter 5 credentials playbook.",
+    "Idempotency guard in create_transaction runs BEFORE the open-shift check, so a duplicate POST with same client_id succeeds even after the shift is closed (returns the original row). This is the intended idempotency contract; leaving a note in case product wants stricter behaviour.",
+    "adjust_bank_balance is not atomic with the transactions.insert_one — insert then update. There is a small window in which a crash between the two would leave a UPI/BANK txn recorded without a matching bank movement. Consider Motor transactions on a replica set, or bundle via a background reconciler. (Non-blocking for MVP.)",
+    "Bank current_balance is stored as a float and mutated via $inc — for a cash ledger this should be a Decimal/int-paise field to avoid float drift. (Non-blocking.)",
+    "ShiftOpenDialog copy/button label still assumes drawer-connected path even when it is offline (see design_issues above)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration7_admin_guard_and_shift.py (new)"
+  ],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100% (all iter-7 checks)"},
+  "test_credentials": "Admin mobile 9999999999 / password admin123 / PIN 123456 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Ephemeral TEST_ staff (create/patch/delete) and one TEST_UPIBank_<hex> bank (opening 1000, soft-deleted at teardown) plus a short-lived shift used for UPI + idempotency assertions. All test-created data prefixed with TEST_ for cleanup.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Both iter 7 fixes verified end-to-end. Backend now guards POST/PATCH/DELETE /api/staff with get_current_admin. Frontend split is clean: cash-register top nav has only Reports/Devices/Admin, admin console owns Banks + Users + Reports + Credentials + Clear Data + Logout. Drawer-offline flow works — shift open/close, UPI action, and txn dialog all reachable; only nit remaining is the ShiftOpenDialog still saying 'pulse open' when drawer is offline (cosmetic).",
+  "rca of the issue": "Not a bug this iteration — both changes verified fixed. Previous cause of unreachable UPI/Bank actions: ShiftControl's Open Shift button used `disabled={!drawerConnected}` which blocked the entire shift lifecycle in headless / offline environments. Fix: gate removed; ShiftOpenDialog / ShiftCloseDialog now check `printer.isConnected` internally and skip the pulse when offline while still recording the shift and denominations. QuickActions still gates CASH-only actions on `cashDisabled = !shift || !drawerConnected`, but UPI/BANK is gated only on `!shift`."
+}
